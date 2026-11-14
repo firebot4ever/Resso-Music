@@ -131,33 +131,6 @@ object DiscordPresence {
                 }
             })
 
-            val buttons = mutableListOf<JsonObject>()
-            if (button1Visible) {
-                val defaultLabel = if (isSpotify) "Play on Resso" else DEFAULT_BUTTON_1
-                val defaultUrl = if (isSpotify) {
-                    val encoded = runCatching { java.net.URLEncoder.encode("${song.title} ${song.artist}", "UTF-8") }.getOrDefault("")
-                    "https://open.spotify.com/search/$encoded"
-                } else if (song.videoId.isNotBlank()) {
-                    "https://music.youtube.com/watch?v=${song.videoId}"
-                } else PROJECT_URL
-                val label = if (button1Text.isNotBlank()) button1Text else defaultLabel
-                buttons.add(buildJsonObject {
-                    put("label", clip(label, 32))
-                    put("url", defaultUrl)
-                })
-            }
-            if (button2Visible) {
-                val label = if (button2Text.isNotBlank()) button2Text else DEFAULT_BUTTON_2
-                buttons.add(buildJsonObject {
-                    put("label", clip(label, 32))
-                    put("url", PROJECT_URL)
-                })
-            }
-            if (buttons.isNotEmpty()) {
-                putJsonArray("buttons") {
-                    buttons.forEach { add(it) }
-                }
-            }
             put("instance", JsonPrimitive(true))
         }
     }

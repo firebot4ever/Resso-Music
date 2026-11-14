@@ -341,36 +341,7 @@ fun DiscordScreen(
                     )
                 }
 
-                SettingsGroup(
-                    header = stringResource(R.string.buttons),
-                    footer = stringResource(R.string.discord_buttons_footer),
-                ) {
-                    SettingsRow(
-                        icon = SfIcons.SmartButton,
-                        title = stringResource(R.string.first_button),
-                        subtitle = button1Text.ifEmpty { DiscordRPC.DEFAULT_BUTTON_1 },
-                        trailing = {
-                            IosSwitch(
-                                checked = button1Visible,
-                                onCheckedChange = AppSettings::setDiscordButton1Visible,
-                            )
-                        },
-                        onClick = { onOpenDialog(DiscordDialog.BUTTON_1) },
-                    )
-                    RowDivider()
-                    SettingsRow(
-                        icon = SfIcons.SmartButton,
-                        title = stringResource(R.string.second_button),
-                        subtitle = button2Text.ifEmpty { DiscordRPC.DEFAULT_BUTTON_2 },
-                        trailing = {
-                            IosSwitch(
-                                checked = button2Visible,
-                                onCheckedChange = AppSettings::setDiscordButton2Visible,
-                            )
-                        },
-                        onClick = { onOpenDialog(DiscordDialog.BUTTON_2) },
-                    )
-                }
+
             }
         }
 
@@ -624,37 +595,6 @@ private fun RichPresencePreview(
                 Spacer(Modifier.height(8.dp))
                 ProgressLine(positionMs = positionMs, durationMs = durationMs)
             }
-        }
-
-        val resolved = { text: String, fallback: String ->
-            val chosen = text.ifEmpty { fallback }
-            if (song != null) DiscordRPC.resolveVariables(chosen, song) else chosen
-        }
-        if (button1Visible) {
-            Spacer(Modifier.height(12.dp))
-            PresenceButton(
-                label = resolved(button1Text, DiscordRPC.DEFAULT_BUTTON_1),
-                enabled = song != null,
-                onClick = {
-                    song?.let {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, DiscordRPC.watchUrl(it).toUri()),
-                        )
-                    }
-                },
-            )
-        }
-        if (button2Visible) {
-            Spacer(Modifier.height(8.dp))
-            PresenceButton(
-                label = resolved(button2Text, DiscordRPC.DEFAULT_BUTTON_2),
-                enabled = true,
-                onClick = {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, DiscordRPC.PROJECT_URL.toUri()),
-                    )
-                },
-            )
         }
     }
 }

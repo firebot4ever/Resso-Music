@@ -342,13 +342,16 @@ fun FloatingBottomBar(
             // color instead and picks pure black or white, same as the tint
             // Echo's floating nav bar uses for its own liquid glass.
             val glassTint = glassContentColor()
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val customAccent = primaryColor.takeIf { it != Color.White && it != Color.Black }
+            val effectiveSelectedTint = customAccent ?: (if (useGlass) glassTint else null)
             val adaptiveTint = if (useGlass) glassTint else null
             tabs.forEachIndexed { index, tab ->
                 BottomBarItem(
                     tab = tab,
                     selected = index == selectedIndex,
                     glassSpec = glassSpec,
-                    selectedTint = adaptiveTint,
+                    selectedTint = effectiveSelectedTint,
                     unselectedTint = adaptiveTint?.copy(alpha = 0.65f),
                     onClick = { onTabSelected(index) },
                     modifier = Modifier.weight(1f),

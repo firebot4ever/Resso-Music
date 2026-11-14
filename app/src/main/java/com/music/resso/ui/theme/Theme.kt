@@ -1,14 +1,20 @@
 package com.music.Resso.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.TextStyle
@@ -17,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.music.Resso.R
+import com.music.Resso.data.settings.AccentColor
 import com.music.Resso.data.settings.AppFont
 
 // Apple Music's signature red. No longer the primary accent, but kept for the
@@ -142,10 +149,36 @@ private fun Typography.withFamily(family: FontFamily) = Typography(
 fun RessoTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     font: AppFont = AppFont.DEFAULT,
+    accentColor: AccentColor = AccentColor.DEFAULT,
     content: @Composable () -> Unit,
 ) {
+    val context = LocalContext.current
+    val dynamicColor = accentColor == AccentColor.DYNAMIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    val baseColorScheme = when {
+        dynamicColor && darkTheme -> dynamicDarkColorScheme(context)
+        dynamicColor && !darkTheme -> dynamicLightColorScheme(context)
+        darkTheme -> DarkColors
+        else -> LightColors
+    }
+
+    val colorScheme = remember(baseColorScheme, darkTheme, accentColor) {
+        if (dynamicColor || accentColor == AccentColor.DEFAULT || accentColor.hex == 0L) {
+            baseColorScheme
+        } else {
+            val primaryColor = Color(accentColor.hex)
+            val onPrimary = if (primaryColor.luminance() > 0.5f) Color.Black else Color.White
+            baseColorScheme.copy(
+                primary = primaryColor,
+                onPrimary = onPrimary,
+                secondary = primaryColor.copy(alpha = 0.85f),
+                tertiary = primaryColor.copy(alpha = 0.70f),
+            )
+        }
+    }
+
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = colorScheme,
         typography = when (font) {
             AppFont.DEFAULT -> RessoTypography
             AppFont.LEGACY -> LegacyTypography

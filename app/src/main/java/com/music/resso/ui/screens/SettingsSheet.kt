@@ -169,6 +169,11 @@ import com.music.Resso.data.sources.DeviceCodecs
 import com.music.Resso.data.settings.AudioQuality
 import com.music.Resso.data.settings.DownloadQuality
 import com.music.Resso.data.settings.ThemeMode
+import com.music.Resso.data.settings.AccentColor
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import com.music.Resso.data.settings.AppFont
 import com.music.Resso.data.settings.PlayerTheme
 import com.music.Resso.data.stats.Backup
@@ -263,6 +268,7 @@ fun SettingsScreen(
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
+    val accentColor by AppSettings.accentColor.collectAsStateWithLifecycle()
     val appFont by AppSettings.appFont.collectAsStateWithLifecycle()
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
     val outputPcmMode by AppSettings.outputPcmMode.collectAsStateWithLifecycle()
@@ -1024,6 +1030,19 @@ fun SettingsScreen(
                     options = ThemeMode.entries.map { it.localizedLabel() },
                     selectedIndex = ThemeMode.entries.indexOf(theme),
                     onSelect = { AppSettings.setThemeMode(ThemeMode.entries[it]) },
+                    modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
+                )
+            }
+            val accentColorTitle = "App Theme Color"
+            row(accentColorTitle, "accent", "color", "theme color", "tint", "red", "green", "blue", "purple", "orange", "pink", "teal", "yellow") {
+                SettingsRow(
+                    icon = SfIcons.Appearance,
+                    title = accentColorTitle,
+                    subtitle = accentColor.label,
+                )
+                AccentColorPicker(
+                    selected = accentColor,
+                    onSelect = { AppSettings.setAccentColor(it) },
                     modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
                 )
             }
@@ -2832,6 +2851,91 @@ internal fun SegmentedControl(
     enabled: Boolean = true,
 ) {
     PillSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
+}
+
+@Composable
+private fun AccentColorPicker(
+    selected: AccentColor,
+    onSelect: (AccentColor) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = LocalHapticFeedback.current
+    val scrollState = rememberScrollState()
+    val availableColors = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AccentColor.entries
+        } else {
+            AccentColor.entries.filter { it != AccentColor.DYNAMIC }
+        }
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        availableColors.forEach { color ->
+            val isSelected = color == selected
+            val circleSize = 38.dp
+            val shape = CircleShape
+
+            val swatchColor = when (color) {
+                AccentColor.DEFAULT -> Color(0xFFFA2D48)
+                AccentColor.DYNAMIC -> MaterialTheme.colorScheme.primary
+                else -> Color(color.hex)
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(circleSize)
+                    .clip(shape)
+                    .background(
+                        if (color == AccentColor.DYNAMIC) {
+                            Brush.sweepGradient(
+                                listOf(
+                                    Color(0xFF0A84FF),
+                                    Color(0xFFA855F7),
+                                    Color(0xFFFF2D55),
+                                    Color(0xFFFF9500),
+                                    Color(0xFF1DB954),
+                                    Color(0xFF0A84FF),
+                                )
+                            )
+                        } else {
+                            SolidColor(swatchColor)
+                        }
+                    )
+                    .border(
+                        width = if (isSelected) 3.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.25f),
+                        shape = shape,
+                    )
+                    .clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelect(color)
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSelected) {
+                    val iconTint = if (color == AccentColor.DYNAMIC) {
+                        Color.White
+                    } else if (swatchColor.luminance() > 0.5f) {
+                        Color.Black
+                    } else {
+                        Color.White
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = color.label,
+                        tint = iconTint,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    }
 }
 
 // ---- Pages ------------------------------------------------------------------

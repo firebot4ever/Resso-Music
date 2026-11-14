@@ -127,6 +127,19 @@ enum class ThemeMode(val label: String) {
     SYSTEM("System"), LIGHT("Light"), DARK("Dark")
 }
 
+enum class AccentColor(val label: String, val hex: Long) {
+    DEFAULT("Default", 0L),
+    RED("Crimson Red", 0xFFFA2D48),
+    GREEN("Spotify Green", 0xFF1DB954),
+    PURPLE("Neon Purple", 0xFFA855F7),
+    BLUE("Electric Blue", 0xFF0A84FF),
+    ORANGE("Sunset Orange", 0xFFFF9500),
+    PINK("Hot Pink", 0xFFFF2D55),
+    TEAL("Aqua Teal", 0xFF00C7BE),
+    YELLOW("Amber Gold", 0xFFFFD60A),
+    DYNAMIC("Material You", 0L);
+}
+
 /**
  * How the app's SF Pro Display is set. [DEFAULT] draws each weight one cut
  * lighter and spaces it to Apple Music's own screens; [LEGACY] is the cut the
@@ -411,6 +424,7 @@ object AppSettings {
     val playbackSpeed = MutableStateFlow(1.0f)
     val themeMode = MutableStateFlow(ThemeMode.DARK)
     val appFont = MutableStateFlow(AppFont.DEFAULT)
+    val accentColor = MutableStateFlow(AccentColor.DEFAULT)
 
     /** Keep playing similar music once the queue runs out. */
     val autoplay = MutableStateFlow(true)
@@ -1019,6 +1033,9 @@ object AppSettings {
         appFont.value = runCatching {
             AppFont.valueOf(prefs.getString(KEY_APP_FONT, null) ?: AppFont.DEFAULT.name)
         }.getOrDefault(AppFont.DEFAULT)
+        accentColor.value = runCatching {
+            AccentColor.valueOf(prefs.getString(KEY_ACCENT_COLOR, null) ?: AccentColor.DEFAULT.name)
+        }.getOrDefault(AccentColor.DEFAULT)
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
@@ -1422,6 +1439,11 @@ object AppSettings {
     fun setAppFont(value: AppFont) {
         appFont.value = value
         prefs.edit().putString(KEY_APP_FONT, value.name).apply()
+    }
+
+    fun setAccentColor(value: AccentColor) {
+        accentColor.value = value
+        prefs.edit().putString(KEY_ACCENT_COLOR, value.name).apply()
     }
 
     fun setReduceAnimation(value: Boolean) {
@@ -2301,6 +2323,7 @@ object AppSettings {
     private const val KEY_EQ_BANDS = "equalizer_bands"
     private const val KEY_SPEED = "playback_speed"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_ACCENT_COLOR = "accent_color"
     private const val KEY_APP_FONT = "app_font"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"

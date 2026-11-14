@@ -87,8 +87,10 @@ jobs:
         generate_release_notes: false
         body: |
           ### What's New:
+          - Full Multi-Color App Theme Customizer: Choose from Crimson Red, Spotify Green, Neon Purple, Electric Blue, Sunset Orange, Hot Pink, Aqua Teal, Amber Gold, or Material You Dynamic wallpaper theming!
+          - Discord Rich Presence: Removed action buttons from Discord player for a clean, sleek card display
           - Spotify account profile photo and user display
           - Home Screen Floating Dynamic Island (Camera punch hole & expanded playback controls)
           - In-App Direct APK Updater (Installs automatically without opening browser)
-          - Fixed Package Installer integration for Android 10+
+          - Permanent Release Keystore integration
           - Performance and playback stability improvements

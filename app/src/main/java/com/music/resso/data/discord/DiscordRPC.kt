@@ -81,22 +81,6 @@ class DiscordRPC(
         val remainingDuration = durationMillis - currentPlaybackTimeMillis
         val adjustedRemainingDuration = (remainingDuration / playbackSpeed).toLong()
 
-        val buttonsList = mutableListOf<Pair<String, String>>()
-        if (button1Visible) {
-            val resolvedText = resolveVariables(
-                button1Text.ifEmpty { DEFAULT_BUTTON_1 },
-                song,
-            )
-            buttonsList.add(resolvedText to watchUrl(song))
-        }
-        if (button2Visible) {
-            val resolvedText = resolveVariables(
-                button2Text.ifEmpty { DEFAULT_BUTTON_2 },
-                song,
-            )
-            buttonsList.add(resolvedText to PROJECT_URL)
-        }
-
         val type = when (activityType) {
             "playing" -> Type.PLAYING
             "watching" -> Type.WATCHING
@@ -127,7 +111,7 @@ class DiscordRPC(
             // measured premium format.
             largeText = audioQuality,
             smallText = null,
-            buttons = if (buttonsList.isNotEmpty()) buttonsList else null,
+            buttons = null,
             type = type,
             statusDisplayType = if (useDetails) StatusDisplayType.DETAILS else StatusDisplayType.STATE,
             since = currentTime,
