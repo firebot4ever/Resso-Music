@@ -56,11 +56,29 @@ jobs:
         path: |
           app/build/outputs/apk/prod/**/*.apk
 
+    - name: Prepare Release APKs
+      run: |
+        mkdir -p release-apks
+        TAG_NAME="${{ github.ref_name }}"
+        [ -z "$TAG_NAME" ] && TAG_NAME="latest"
+        find app/build/outputs/apk/prod -name "*.apk" -type f | while read -r f; do
+          fname=$(basename "$f")
+          if [[ "$fname" == *"universal"* ]]; then
+            cp "$f" "release-apks/Resso-${TAG_NAME}.apk"
+          elif [[ "$fname" == *"arm64-v8a"* ]]; then
+            cp "$f" "release-apks/Resso-${TAG_NAME}_arm64-v8a.apk"
+          elif [[ "$fname" == *"armeabi-v7a"* ]]; then
+            cp "$f" "release-apks/Resso-${TAG_NAME}_armeabi-v7a.apk"
+          elif [[ "$fname" == *"x86_64"* ]]; then
+            cp "$f" "release-apks/Resso-${TAG_NAME}_x86_64.apk"
+          fi
+          cp "$f" "release-apks/$fname"
+        done
+        ls -la release-apks
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       with:
-        files: |
-          app/build/outputs/apk/prod/debug/*.apk
-          app/build/outputs/apk/prod/release/*.apk
+        files: release-apks/*.apk
         generate_release_notes: true

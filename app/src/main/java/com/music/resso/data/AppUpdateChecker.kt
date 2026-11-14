@@ -114,26 +114,27 @@ object AppUpdateChecker {
             ?.mapNotNull { asset ->
                 val name = asset["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                 val url = asset["browser_download_url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val ours = name.startsWith(BuildConfig.UPDATE_APK_PREFIX, ignoreCase = true) &&
-                    name.endsWith(".apk", ignoreCase = true) &&
-                    asset["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
-                if (ours) name.removeSuffix(".apk").removeSuffix(".APK") to url else null
+                val isApk = name.endsWith(".apk", ignoreCase = true)
+                val isUploaded = asset["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
+                if (isApk && isUploaded) name to url else null
             }
             .orEmpty()
-        apks.firstOrNull { (name, _) -> '_' !in name }?.second
+        apks.firstOrNull { (name, _) ->
+            name.contains("universal", ignoreCase = true) || ('_' !in name && !name.contains("arm", ignoreCase = true))
+        }?.second
             ?: Build.SUPPORTED_ABIS.firstNotNullOfOrNull { abi ->
-                apks.firstOrNull { (name, _) -> name.endsWith("_$abi") }?.second
+                apks.firstOrNull { (name, _) -> name.contains(abi, ignoreCase = true) }?.second
             }
+            ?: apks.firstOrNull()?.second
     }.getOrNull()
 
     /**
      * Streams the current update's APK into the app cache, reporting progress
-     * through [download]. A finished file survives a cancelled dialog: until
-     * the state is reset, "Install Now" comes straight back without a second
-     * download.
+     * through [download]. As soon as download completes, it automatically invokes
+     * the system package installer without requiring any extra user navigation.
      */
-    suspend fun downloadApk(context: Context): Unit = withContext(Dispatchers.IO) {
-        val info = _available.value ?: return@withContext
+    suspend fun downloadApk(context: Context, explicitInfo: UpdateInfo? = null): Unit = withContext(Dispatchers.IO) {
+        val info = explicitInfo ?: _available.value ?: return@withContext
         val url = info.apkUrl ?: return@withContext
         downloadCancelled = false
         _download.value = DownloadState.Downloading(0f)
@@ -172,6 +173,10 @@ object AppUpdateChecker {
                 }
             }
             _download.value = DownloadState.Ready(target)
+            // Automatically launch system package installer immediately upon download completion
+            withContext(Dispatchers.Main) {
+                installApk(context, target)
+            }
         }.onFailure { error ->
             _download.value = if (downloadCancelled) {
                 DownloadState.Idle

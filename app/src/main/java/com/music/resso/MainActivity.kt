@@ -5532,12 +5532,10 @@ private fun RessoApp(
                     // update icon reopens it onto whatever state it reached.
                     onDismiss = { showUpdateDialog = false },
                     onDownload = {
-                        if (update.apkUrl != null) {
-                            scope.launch { AppUpdateChecker.downloadApk(context) }
-                        } else {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.releaseUrl)))
-                            showUpdateDialog = false
-                        }
+                        val apkUrl = update.apkUrl
+                            ?: "https://github.com/firebot4ever/Resso-Music/releases/download/v${update.version}/Resso-v${update.version}.apk"
+                        val effectiveUpdate = update.copy(apkUrl = apkUrl)
+                        scope.launch { AppUpdateChecker.downloadApk(context, effectiveUpdate) }
                     },
                     onCancelDownload = {
                         AppUpdateChecker.cancelDownload()
