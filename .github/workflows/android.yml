@@ -81,4 +81,11 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       with:
         files: release-apks/*.apk
-        generate_release_notes: true
+        generate_release_notes: false
+        body: |
+          ### What's New:
+          - Home Screen Floating Dynamic Island (Camera punch hole & expanded playback controls)
+          - In-App Direct APK Updater (Installs automatically without opening browser)
+          - Fixed Package Installer integration for Android 10+
+          - Spotify account name integration
+          - Performance and playback stability improvements

@@ -25,6 +25,7 @@ object DiscordPresence {
 
     const val PROJECT_URL = "https://github.com/firebot4ever/Resso"
     const val DEFAULT_BUTTON_1 = "Listen on YouTube Music"
+    const val DEFAULT_BUTTON_2 = "Visit Resso"
 
     /** Discord truncates nothing for us: over-long fields are dropped. */
     const val MAX_FIELD = 120

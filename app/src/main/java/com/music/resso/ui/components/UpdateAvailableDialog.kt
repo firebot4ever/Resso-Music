@@ -83,6 +83,32 @@ private val NOTES_MAX_HEIGHT = 220.dp
  * so its glass can sample the same [HazeState] the rest of the app's frosted
  * surfaces use, the way [FrostedTopBar] and [MiniPlayer] already do.
  */
+private fun formatChangelog(rawNotes: String?): String {
+    val lines = rawNotes
+        ?.lines()
+        ?.map { it.trim() }
+        ?.filter { line ->
+            line.isNotEmpty() &&
+                !line.contains("Full Changelog", ignoreCase = true) &&
+                !line.contains("compare/v", ignoreCase = true) &&
+                !line.startsWith("http://", ignoreCase = true) &&
+                !line.startsWith("https://", ignoreCase = true)
+        }
+        .orEmpty()
+
+    if (lines.isNotEmpty()) {
+        return lines.joinToString("\n")
+    }
+
+    return """
+        • Home Screen Floating Dynamic Island
+        • In-App direct update & auto-installation
+        • Spotify account display name sync
+        • Background playback stability & bug fixes
+    """.trimIndent()
+}
+
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun UpdateAvailableDialog(
     version: String,
@@ -95,13 +121,18 @@ fun UpdateAvailableDialog(
     onOpenReleasePage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val state by AppUpdateChecker.download.collectAsStateWithLifecycle()
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(ALERT_CORNER)
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
+            .background(SCRIM_COLOR)
+            // Tapping the scrim reads the same as Remind Me Later — nothing
+            // about this update is mandatory, so backing out of it should be as
+            // easy as getting into it. Mid-download it only closes the sheet;
+            // the download keeps going and the top-bar icon reopens this.
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -111,152 +142,144 @@ fun UpdateAvailableDialog(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .widthIn(max = 350.dp)
+                .width(ALERT_WIDTH)
                 .clip(shape)
-                .background(Color(0xFF0A0A0A))
-                .border(0.8.dp, Color(0xFF222222), shape)
+                .then(
+                    if (reduceDynamicBlur) {
+                        Modifier.background(MaterialTheme.colorScheme.surface)
+                    } else {
+                        Modifier.optimizedHazeEffect(
+                            state = hazeState,
+                            style = HazeMaterials.regular(MaterialTheme.colorScheme.surface),
+                        )
+                    },
+                )
+                // Swallows the tap before it reaches the scrim behind, so
+                // touching the card itself never dismisses it.
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() },
                     onClick = {},
-                )
-                .padding(horizontal = 22.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                ),
         ) {
-            // 🌟 Resso Music 🌟
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 19.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "🌟 ",
-                    fontSize = 17.sp,
-                )
-                Text(
-                    text = "Resso Music",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                    text = stringResource(R.string.software_update),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.W600,
                     ),
-                    color = Color(0xFF2979FF),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = " 🌟",
-                    fontSize = 17.sp,
+                    text = when (state) {
+                        is AppUpdateChecker.DownloadState.Downloading ->
+                            stringResource(R.string.update_downloading_body, version)
+                        is AppUpdateChecker.DownloadState.Ready ->
+                            stringResource(R.string.update_ready_body, version)
+                        is AppUpdateChecker.DownloadState.Failed ->
+                            stringResource(R.string.update_failed_body, version)
+                        else ->
+                            stringResource(R.string.update_available_body, version)
+                    },
+                    modifier = Modifier.padding(top = 4.dp),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 17.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
                 )
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                // The download's progress, drawn as a thin fill across a
+                // hairline track — same weight as [AlertRule], so it reads as
+                // part of the card rather than a widget bolted onto it.
+                val downloading = state as? AppUpdateChecker.DownloadState.Downloading
+                if (downloading != null || state is AppUpdateChecker.DownloadState.Failed) {
+                    Box(
+                        Modifier
+                            .padding(top = 12.dp)
+                            .fillMaxWidth()
+                            .height(DOWNLOAD_ROW_HEIGHT)
+                            .clip(RoundedCornerShape(DOWNLOAD_ROW_HEIGHT / 2))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
+                    ) {
+                        if (downloading != null && downloading.fraction > 0f) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(downloading.fraction)
+                                    .height(DOWNLOAD_ROW_HEIGHT)
+                                    .clip(RoundedCornerShape(DOWNLOAD_ROW_HEIGHT / 2))
+                                    .background(MaterialTheme.colorScheme.primary),
+                            )
+                        }
+                    }
+                }
+                if (state is AppUpdateChecker.DownloadState.Failed) {
+                    Text(
+                        text = (state as AppUpdateChecker.DownloadState.Failed).message,
+                        modifier = Modifier.padding(top = 6.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                }
 
-            // Body text 1
-            Text(
-                text = "Dear User, New Mod Version v$version Is released. Please install Directly From Resso Music",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.5.sp,
-                    lineHeight = 21.sp,
-                    fontWeight = FontWeight.Normal,
-                ),
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Body text 2
-            Text(
-                text = "Resso Music is Your Final Destination For Music 😉",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.5.sp,
-                    lineHeight = 21.sp,
-                    fontWeight = FontWeight.Normal,
-                ),
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            // Progress bar if downloading
-            val downloading = state as? AppUpdateChecker.DownloadState.Downloading
-            if (downloading != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(Color(0xFF2A2A2A)),
-                ) {
+                // What's new changelog with clean bullet points
+                val changelog = remember(notes) { formatChangelog(notes) }
+                if (changelog.isNotBlank()) {
+                    AlertRule(modifier = Modifier.padding(top = 12.dp))
+                    Text(
+                        text = stringResource(R.string.whats_new),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.W600,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Start,
+                    )
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(downloading.fraction.coerceIn(0.05f, 1f))
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0xFF2979FF)),
-                    )
+                            .padding(top = 6.dp)
+                            .heightIn(max = NOTES_MAX_HEIGHT)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                            RichText(style = RichTextStyle.Default) {
+                                Markdown(changelog)
+                            }
+                        }
+                    }
                 }
-                Spacer(modifier = Modifier.height(5.dp))
-                Text(
-                    text = "Downloading: ${(downloading.fraction * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = Color(0xFF9E9E9E),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
 
-            // Error message if failed
-            if (state is AppUpdateChecker.DownloadState.Failed) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = (state as AppUpdateChecker.DownloadState.Failed).message,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = Color(0xFFFF5252),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(22.dp))
-
-            // Bottom-right UPDATE action button (exact matching photo)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val buttonText = when (state) {
-                    is AppUpdateChecker.DownloadState.Downloading -> "DOWNLOADING"
-                    is AppUpdateChecker.DownloadState.Ready -> "INSTALL"
-                    is AppUpdateChecker.DownloadState.Failed -> "RETRY"
-                    else -> "UPDATE"
+            AlertRule()
+            when (state) {
+                is AppUpdateChecker.DownloadState.Downloading -> {
+                    AlertAction(label = stringResource(R.string.cancel), emphasised = false, onClick = onCancelDownload)
                 }
-
-                val onClickAction = when (state) {
-                    is AppUpdateChecker.DownloadState.Downloading -> onCancelDownload
-                    is AppUpdateChecker.DownloadState.Ready -> onInstall
-                    is AppUpdateChecker.DownloadState.Failed -> onDownload
-                    else -> onDownload
+                is AppUpdateChecker.DownloadState.Ready -> {
+                    // "Install Now" without "Later" button below it
+                    AlertAction(label = stringResource(R.string.install_now), emphasised = true, onClick = onInstall)
                 }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF0D6EFD))
-                        .clickable { onClickAction() }
-                        .padding(horizontal = 24.dp, vertical = 9.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = buttonText,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.5.sp,
-                        ),
-                        color = Color.White,
-                    )
+                is AppUpdateChecker.DownloadState.Failed -> {
+                    AlertAction(label = stringResource(R.string.try_again), emphasised = true, onClick = onDownload)
+                    AlertRule()
+                    AlertAction(label = stringResource(R.string.open_releases_page), emphasised = false, onClick = onOpenReleasePage)
+                }
+                else -> {
+                    AlertAction(label = stringResource(R.string.download_now), emphasised = true, onClick = onDownload)
+                    AlertRule()
+                    AlertAction(label = stringResource(R.string.remind_me_later), emphasised = false, onClick = onDismiss)
                 }
             }
         }
