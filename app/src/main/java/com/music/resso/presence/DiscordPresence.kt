@@ -37,6 +37,7 @@ object DiscordPresence {
 
     /** Asset key for default logo. */
     const val FALLBACK_ASSET = "logo"
+    const val APP_LOGO_URL = "https://raw.githubusercontent.com/firebot4ever/Resso-Music/main/app/src/main/res/drawable/ic_logo.png"
 
     /** 2 = "Listening to". */
     const val TYPE_LISTENING = 2
@@ -125,10 +126,8 @@ object DiscordPresence {
                     else -> title
                 }
                 put("large_text", largeText)
-                if (isSpotify) {
-                    put("small_image", "spotify")
-                    put("small_text", "Spotify Account")
-                }
+                put("small_image", APP_LOGO_URL)
+                put("small_text", "Resso")
             })
 
             put("instance", JsonPrimitive(true))

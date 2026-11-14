@@ -196,6 +196,7 @@ import com.music.Resso.ui.screens.SourcesScreen
 import com.music.Resso.data.sources.TrackMatcher
 import com.music.Resso.ui.screens.SpotifyCanvasAuthScreen
 import com.music.Resso.ui.screens.SpotifyLibraryScreen
+import com.music.Resso.ui.screens.SpotifyHomeScreen
 import com.music.Resso.ui.components.DynamicIsland
 import com.music.Resso.data.spotify.SPOTIFY_PAGE_PREFIX
 import com.music.Resso.playback.AudioCache
@@ -289,6 +290,9 @@ import com.music.Resso.ui.screens.SegmentedControl
 import com.music.Resso.ui.components.SearchField
 import com.music.Resso.sharedui.resources.Res as SharedRes
 import com.music.Resso.sharedui.resources.ic_logo
+import com.music.Resso.sharedui.resources.spotify_logo
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.music.Resso.sharedui.resources.search_hint
 import com.music.Resso.sharedui.resources.search_addons_hint
 import com.music.Resso.sharedui.resources.search_library_hint
@@ -953,7 +957,7 @@ private fun RessoApp(
     val spotifyName by AppSettings.spotifyUserName.collectAsStateWithLifecycle()
     val spotifyAvatar by AppSettings.spotifyUserAvatar.collectAsStateWithLifecycle()
     var spotifyAccount by remember { mutableStateOf<Account?>(null) }
-    LaunchedEffect(spotifyConnected, spotifyName, spotifyAvatar) {
+    LaunchedEffect(spotifyConnected) {
         if (spotifyConnected.isNotBlank()) {
             val initialName = spotifyName.takeIf { it.isNotBlank() } ?: "Spotify User"
             spotifyAccount = Account(
@@ -961,12 +965,19 @@ private fun RessoApp(
                 email = "Spotify Connected",
                 thumbnailUrl = spotifyAvatar.takeIf { it.isNotBlank() },
             )
-            val sp = runCatching { SpotifyLibrary.me() }.getOrNull()
-            if (sp != null && sp.name.isNotBlank() && sp.name != "Spotify User") {
-                val resolvedAvatar = sp.thumbnailUrl ?: spotifyAvatar.takeIf { it.isNotBlank() }
-                spotifyAccount = sp.copy(thumbnailUrl = resolvedAvatar)
-                AppSettings.setSpotifyUserName(sp.name)
-                resolvedAvatar?.let { AppSettings.setSpotifyUserAvatar(it) }
+            // Retry fetching profile up to 6 times to give token harvesting time to complete
+            repeat(6) { attempt ->
+                val sp = runCatching { SpotifyLibrary.me() }.getOrNull()
+                if (sp != null && sp.name.isNotBlank() && sp.name != "Spotify User") {
+                    val resolvedAvatar = sp.thumbnailUrl?.takeIf { it.isNotBlank() } ?: spotifyAvatar.takeIf { it.isNotBlank() }
+                    spotifyAccount = sp.copy(thumbnailUrl = resolvedAvatar)
+                    AppSettings.setSpotifyUserName(sp.name)
+                    if (!resolvedAvatar.isNullOrBlank()) {
+                        AppSettings.setSpotifyUserAvatar(resolvedAvatar)
+                    }
+                    if (!resolvedAvatar.isNullOrBlank()) return@LaunchedEffect
+                }
+                delay(if (attempt == 0) 1000L else 2500L)
             }
         } else {
             spotifyAccount = null
@@ -3434,68 +3445,86 @@ private fun RessoApp(
                                 },
                             )
                         } else when ((destination as? AppDestination.Tab)?.index ?: selectedTab) {
-                            TAB_HOME -> HomeScreen(
-                                state = visibleHomeState,
-                                listState = homeListState,
-                                currentSong = player.song,
-                                isPlaying = player.isPlaying,
-                                title = null,
-                                festiveLogo = diwaliFestive,
-                                onFestiveLogoClick = { showDiwali = true },
-                                signedIn = isUserSignedIn,
-                                onSignIn = { showSignInChooser = true },
-                                onSignInSpotify = { showSpotifyLogin = true },
-                                onItemClick = { item, shelfTitle ->
-                                    val song = shelfSong(item)
-                                    // Hoisted because ShelfItem lives in :shared, and
-                                    // Kotlin will not smart-cast a public nullable
-                                    // property declared in another module.
-                                    val browseId = item.browseId
-                                    when {
-                                        song != null -> playRadio(
-                                            song,
-                                            QueueSource(shelfTitle, PlaybackSourceType.HOME),
-                                        )
-                                        browseId != null -> viewModel.openDetail(
-                                            browseId = browseId,
-                                            title = item.title,
-                                            subtitle = item.subtitle,
-                                            thumbnailUrl = item.thumbnailUrl,
-                                        )
-                                    }
-                                },
-                                onItemLongPress = onShelfLongPress,
-                                onRetry = viewModel::loadHome,
-                                refreshing = MainViewModel.Feed.HOME in refreshing,
-                                onRefresh = { viewModel.refresh(MainViewModel.Feed.HOME) },
-                                pullState = homePull,
-                                contentPadding = listPadding,
-                                onLoadMore = viewModel::loadMoreHome,
-                                loadingMore = homeLoadingMore,
-                                recentlyPlayedLoading = homeRecentlyPlayedLoading && !hideRecents,
-                                topPicks = topPicks,
-                                topPicksLoading = topPicksLoading,
-                                listenerName = effectiveAccount?.name,
-                                // Neither shelf is drawn without its callback.
-                                onTopPickClick = openTopPick.takeUnless { hideTopPicks },
-                                onMoodClick = playMood.takeUnless { hideHomeMoods },
-                                onMoodsShowAll = { navigator.push(AppRoute.Moods) },
-                                // Nothing on Home is seen while the greeting covers it.
-                                artworkMotion = artworkMotion && !showDiwali,
-                                onTopPickLongPress = { pick ->
-                                    pick.browseId?.let { browseId ->
-                                        onShelfLongPress(
-                                            ShelfItem(
-                                                title = pick.title,
-                                                subtitle = pick.artistName.orEmpty(),
-                                                thumbnailUrl = pick.images.firstOrNull(),
-                                                videoId = null,
-                                                browseId = browseId,
-                                            ),
-                                        )
-                                    }
-                                },
-                            )
+                            TAB_HOME -> {
+                                if (!signedIn && spotifyConnected.isNotBlank()) {
+                                    SpotifyHomeScreen(
+                                        onOpenPlaylist = { playlist ->
+                                            viewModel.openDetail(
+                                                browseId = SPOTIFY_PAGE_PREFIX + playlist.id,
+                                                title = playlist.name,
+                                                subtitle = playlist.owner ?: context.getString(R.string.spotify),
+                                                thumbnailUrl = playlist.imageUrl,
+                                                type = BrowseType.PLAYLIST,
+                                            )
+                                        },
+                                        onOpenAccount = { showAccountSelector = true },
+                                        contentPadding = listPadding,
+                                    )
+                                } else {
+                                    HomeScreen(
+                                        state = visibleHomeState,
+                                        listState = homeListState,
+                                        currentSong = player.song,
+                                        isPlaying = player.isPlaying,
+                                        title = null,
+                                        festiveLogo = diwaliFestive,
+                                        onFestiveLogoClick = { showDiwali = true },
+                                        signedIn = isUserSignedIn,
+                                        onSignIn = { showSignInChooser = true },
+                                        onSignInSpotify = { showSpotifyLogin = true },
+                                        onItemClick = { item, shelfTitle ->
+                                            val song = shelfSong(item)
+                                            // Hoisted because ShelfItem lives in :shared, and
+                                            // Kotlin will not smart-cast a public nullable
+                                            // property declared in another module.
+                                            val browseId = item.browseId
+                                            when {
+                                                song != null -> playRadio(
+                                                    song,
+                                                    QueueSource(shelfTitle, PlaybackSourceType.HOME),
+                                                )
+                                                browseId != null -> viewModel.openDetail(
+                                                    browseId = browseId,
+                                                    title = item.title,
+                                                    subtitle = item.subtitle,
+                                                    thumbnailUrl = item.thumbnailUrl,
+                                                )
+                                            }
+                                        },
+                                        onItemLongPress = onShelfLongPress,
+                                        onRetry = viewModel::loadHome,
+                                        refreshing = MainViewModel.Feed.HOME in refreshing,
+                                        onRefresh = { viewModel.refresh(MainViewModel.Feed.HOME) },
+                                        pullState = homePull,
+                                        contentPadding = listPadding,
+                                        onLoadMore = viewModel::loadMoreHome,
+                                        loadingMore = homeLoadingMore,
+                                        recentlyPlayedLoading = homeRecentlyPlayedLoading && !hideRecents,
+                                        topPicks = topPicks,
+                                        topPicksLoading = topPicksLoading,
+                                        listenerName = effectiveAccount?.name,
+                                        // Neither shelf is drawn without its callback.
+                                        onTopPickClick = openTopPick.takeUnless { hideTopPicks },
+                                        onMoodClick = playMood.takeUnless { hideHomeMoods },
+                                        onMoodsShowAll = { navigator.push(AppRoute.Moods) },
+                                        // Nothing on Home is seen while the greeting covers it.
+                                        artworkMotion = artworkMotion && !showDiwali,
+                                        onTopPickLongPress = { pick ->
+                                            pick.browseId?.let { browseId ->
+                                                onShelfLongPress(
+                                                    ShelfItem(
+                                                        title = pick.title,
+                                                        subtitle = pick.artistName.orEmpty(),
+                                                        thumbnailUrl = pick.images.firstOrNull(),
+                                                        videoId = null,
+                                                        browseId = browseId,
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                    )
+                                }
+                            }
                             TAB_EXPLORE -> selectedMoodGenre?.let { category ->
                                 MoodGenrePlaylistsScreen(
                                     title = category.title,
@@ -3936,34 +3965,58 @@ private fun RessoApp(
                         selectedTab == TAB_HOME && route == null && detail == null && selectedMoodGenre == null
                     ) {
                         {
-                            val logoModifier = Modifier
-                                .height(36.dp)
-                                .aspectRatio(492f / 452f)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) {
-                                    if (diwaliFestive) {
-                                        showDiwali = true
-                                    } else {
-                                        scope.launch {
-                                            homeListState.animateScrollToItem(0)
+                            if (!signedIn && spotifyConnected.isNotBlank()) {
+                                val avatar = spotifyAvatar.takeIf { it.isNotBlank() }
+                                if (avatar != null) {
+                                    AsyncImage(
+                                        model = avatar,
+                                        contentDescription = "Spotify Profile",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .clickable { showAccountSelector = true },
+                                    )
+                                } else {
+                                    Icon(
+                                        painter = painterResource(SharedRes.drawable.spotify_logo),
+                                        contentDescription = "Spotify Profile",
+                                        tint = Color(0xFF1DB954),
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clickable { showAccountSelector = true },
+                                    )
+                                }
+                            } else {
+                                val logoModifier = Modifier
+                                    .height(36.dp)
+                                    .aspectRatio(492f / 452f)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) {
+                                        if (diwaliFestive) {
+                                            showDiwali = true
+                                        } else {
+                                            scope.launch {
+                                                homeListState.animateScrollToItem(0)
+                                            }
                                         }
                                     }
+                                if (diwaliFestive) {
+                                    GoldenLogo(
+                                        painter = painterResource(SharedRes.drawable.ic_logo),
+                                        modifier = logoModifier,
+                                        onClick = { showDiwali = true },
+                                    )
+                                } else {
+                                    Icon(
+                                        painter = painterResource(SharedRes.drawable.ic_logo),
+                                        contentDescription = "Resso",
+                                        tint = Color.Unspecified,
+                                        modifier = logoModifier,
+                                    )
                                 }
-                            if (diwaliFestive) {
-                                GoldenLogo(
-                                    painter = painterResource(SharedRes.drawable.ic_logo),
-                                    modifier = logoModifier,
-                                    onClick = { showDiwali = true },
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(SharedRes.drawable.ic_logo),
-                                    contentDescription = "Resso",
-                                    tint = Color.Unspecified,
-                                    modifier = logoModifier,
-                                )
                             }
                         }
                     } else null,

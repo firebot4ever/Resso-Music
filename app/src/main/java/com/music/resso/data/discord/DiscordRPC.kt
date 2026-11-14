@@ -105,12 +105,12 @@ class DiscordRPC(
             largeImage = song.artworkAt(ART_PX)
                 ?.takeIf { it.startsWith("http") }
                 ?.let(RpcImage::ExternalImage),
-            smallImage = null,
+            smallImage = RpcImage.ExternalImage("https://raw.githubusercontent.com/firebot4ever/Resso-Music/main/app/src/main/res/drawable/ic_logo.png"),
             // The card's optional third information line. Kept absent for
             // ordinary lossy streams so Discord only calls attention to a
             // measured premium format.
             largeText = audioQuality,
-            smallText = null,
+            smallText = "Resso",
             buttons = null,
             type = type,
             statusDisplayType = if (useDetails) StatusDisplayType.DETAILS else StatusDisplayType.STATE,

@@ -87,10 +87,9 @@ jobs:
         generate_release_notes: false
         body: |
           ### What's New:
+          - Native Spotify Home Screen: If logged in with Spotify, Home transforms into a full Spotify home view (2-column Quick Access grid, Liked Songs, Made For You mixes with Spotify badge, and Your Playlists)
+          - Spotify Profile Photo: Real-time profile photo display in the top bar and account screen with automatic retry fetching
+          - Discord Rich Presence: Replaced missing asset dice with official Resso app logo on player card, and removed buttons for a sleek look
           - Full Multi-Color App Theme Customizer: Choose from Crimson Red, Spotify Green, Neon Purple, Electric Blue, Sunset Orange, Hot Pink, Aqua Teal, Amber Gold, or Material You Dynamic wallpaper theming!
-          - Discord Rich Presence: Removed action buttons from Discord player for a clean, sleek card display
-          - Spotify account profile photo and user display
           - Home Screen Floating Dynamic Island (Camera punch hole & expanded playback controls)
-          - In-App Direct APK Updater (Installs automatically without opening browser)
-          - Permanent Release Keystore integration
-          - Performance and playback stability improvements
+          - Permanent Keystore Integration for clean in-app updates
