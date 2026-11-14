@@ -143,20 +143,28 @@ android {
     }
 
     signingConfigs {
-        // Both halves have to be there, not just the properties file: it *names*
-        // the keystore rather than containing it, and both are gitignored
-        // separately, so a checkout can easily end up with the one and not the
-        // other. A signing config pointing at a keystore that is not on disk
-        // fails the release build outright at validateSigningRelease — which is
-        // exactly the failure the unsigned fallback above exists to avoid, so
-        // the keystore has to be looked for rather than assumed.
-        val store = signing.getProperty("storeFile")?.let { rootProject.file(it) }
+        val repoKeystore = rootProject.file("keystore/resso.jks")
+        val store = if (repoKeystore.exists()) {
+            repoKeystore
+        } else {
+            signing.getProperty("storeFile")?.let { rootProject.file(it) }
+        }
         if (store != null && store.exists()) {
             create("release") {
                 storeFile = store
-                storePassword = signing.getProperty("storePassword")
-                keyAlias = signing.getProperty("keyAlias")
-                keyPassword = signing.getProperty("keyPassword")
+                if (store == repoKeystore) {
+                    storePassword = "ressomusicapp"
+                    keyAlias = "resso"
+                    keyPassword = "ressomusicapp"
+                } else {
+                    storePassword = signing.getProperty("storePassword")
+                    keyAlias = signing.getProperty("keyAlias")
+                    keyPassword = signing.getProperty("keyPassword")
+                }
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
             }
         }
     }
@@ -164,6 +172,7 @@ android {
     buildTypes {
         debug {
             if (betaSuffix.isNotEmpty()) versionNameSuffix = "-$betaSuffix"
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         release {
             // Carried here too — see [betaSuffix]. A sideloaded beta is a

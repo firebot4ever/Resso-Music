@@ -63,6 +63,9 @@ jobs:
         [ -z "$TAG_NAME" ] && TAG_NAME="latest"
         find app/build/outputs/apk/prod -name "*.apk" -type f | while read -r f; do
           fname=$(basename "$f")
+          if [[ "$fname" == *"-unsigned.apk"* ]]; then
+            continue
+          fi
           if [[ "$fname" == *"universal"* ]]; then
             cp "$f" "release-apks/Resso-${TAG_NAME}.apk"
           elif [[ "$fname" == *"arm64-v8a"* ]]; then
