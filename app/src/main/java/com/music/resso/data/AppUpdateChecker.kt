@@ -1,10 +1,13 @@
 package com.music.Resso.data
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -123,13 +126,28 @@ object AppUpdateChecker {
                 if (isApk && isUploaded) name to url else null
             }
             .orEmpty()
-        apks.firstOrNull { (name, _) ->
-            name.contains("universal", ignoreCase = true) || ('_' !in name && !name.contains("arm", ignoreCase = true))
+
+        // Prioritize official release APKs and exclude -debug.apk builds
+        val releaseApks = apks.filter { (name, _) ->
+            !name.contains("debug", ignoreCase = true)
+        }.ifEmpty { apks }
+
+        // 1. Device ABI matching official release build (e.g. Resso-v2.0.0_arm64-v8a.apk)
+        Build.SUPPORTED_ABIS.firstNotNullOfOrNull { abi ->
+            releaseApks.firstOrNull { (name, _) ->
+                name.startsWith("Resso-", ignoreCase = true) && name.contains(abi, ignoreCase = true)
+            }?.second
+        }
+        // 2. Universal official release build (e.g. Resso-v2.0.0.apk)
+        ?: releaseApks.firstOrNull { (name, _) ->
+            name.startsWith("Resso-", ignoreCase = true) && !name.contains('_')
         }?.second
-            ?: Build.SUPPORTED_ABIS.firstNotNullOfOrNull { abi ->
-                apks.firstOrNull { (name, _) -> name.contains(abi, ignoreCase = true) }?.second
-            }
-            ?: apks.firstOrNull()?.second
+        // 3. Any universal build
+        ?: releaseApks.firstOrNull { (name, _) ->
+            name.contains("universal", ignoreCase = true)
+        }?.second
+        // 4. Fallback to any APK in release
+        ?: releaseApks.firstOrNull()?.second
     }.getOrNull()
 
     /**
@@ -211,6 +229,77 @@ object AppUpdateChecker {
     }
 
     /**
+     * Checks if the downloaded APK is signed with the same key as the running app.
+     * Prevents Android's INSTALL_FAILED_UPDATE_INCOMPATIBLE ("package conflicts with an existing package").
+     */
+    fun isSignatureMatching(context: Context, file: File): Boolean {
+        return runCatching {
+            val pm = context.packageManager
+            val installedPkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES.toLong()))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+            }
+            val archivePkg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageArchiveInfo(file.absolutePath, PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES.toLong()))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageArchiveInfo(file.absolutePath, PackageManager.GET_SIGNATURES)
+            } ?: return@runCatching true
+
+            val installedSigners = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                installedPkg.signingInfo?.apkContentsSigners?.map { it.toByteArray().contentHashCode() }
+            } else {
+                @Suppress("DEPRECATION")
+                installedPkg.signatures?.map { it.toByteArray().contentHashCode() }
+            }
+
+            val archiveSigners = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                archivePkg.signingInfo?.apkContentsSigners?.map { it.toByteArray().contentHashCode() }
+            } else {
+                @Suppress("DEPRECATION")
+                archivePkg.signatures?.map { it.toByteArray().contentHashCode() }
+            }
+
+            if (!installedSigners.isNullOrEmpty() && !archiveSigners.isNullOrEmpty()) {
+                installedSigners.any { it in archiveSigners }
+            } else {
+                true
+            }
+        }.getOrDefault(true)
+    }
+
+    /**
+     * Preserves a copy of the APK in the device's public Downloads directory.
+     * This ensures the APK survives even if the app is uninstalled.
+     */
+    fun copyApkToPublicDownloads(context: Context, sourceFile: File, targetName: String) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, targetName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/vnd.android.package-archive")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    context.contentResolver.openOutputStream(uri)?.use { outStream ->
+                        sourceFile.inputStream().use { inStream -> inStream.copyTo(outStream) }
+                    }
+                }
+            } else {
+                val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (downloads != null) {
+                    if (!downloads.exists()) downloads.mkdirs()
+                    val target = File(downloads, targetName)
+                    sourceFile.copyTo(target, overwrite = true)
+                }
+            }
+        }
+    }
+
+    /**
      * Hands a downloaded APK to the system installer.
      *
      * Modern Android requires [Intent.ACTION_VIEW] with "application/vnd.android.package-archive"
@@ -223,6 +312,27 @@ object AppUpdateChecker {
         }
 
         file.setReadable(true, false)
+
+        // Save a copy to public Downloads so the user never loses the APK
+        val targetName = "Resso-${_available.value?.version ?: "update"}.apk"
+        copyApkToPublicDownloads(context, file, targetName)
+
+        val compatible = isSignatureMatching(context, file)
+        if (!compatible) {
+            Toast.makeText(
+                context,
+                "Package signature mismatch with previous build. Opening uninstaller to delete old package...",
+                Toast.LENGTH_LONG,
+            ).show()
+            runCatching {
+                val uninstallIntent = Intent(Intent.ACTION_DELETE).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(uninstallIntent)
+            }
+            return
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()

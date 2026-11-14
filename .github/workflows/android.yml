@@ -75,7 +75,6 @@ jobs:
           elif [[ "$fname" == *"x86_64"* ]]; then
             cp "$f" "release-apks/Resso-${TAG_NAME}_x86_64.apk"
           fi
-          cp "$f" "release-apks/$fname"
         done
         ls -la release-apks
 
@@ -83,7 +82,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
       with:
-        files: release-apks/*.apk
+        files: release-apks/Resso-*.apk
         generate_release_notes: false
         body: |
           ### What's New:
