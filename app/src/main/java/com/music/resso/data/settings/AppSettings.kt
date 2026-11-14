@@ -427,6 +427,9 @@ object AppSettings {
     /** Show the output / Listen Together pill under the player's transport. */
     val showListenTogetherButton = MutableStateFlow(false)
 
+    /** Interactive Dynamic Island / Live Capsule pill around camera punch-hole during playback. */
+    val dynamicIslandEnabled = MutableStateFlow(true)
+
     /** Freezes the main player's mesh gradient instead of letting it drift/crossfade. */
     val reduceAnimation = MutableStateFlow(false)
 
@@ -1021,6 +1024,7 @@ object AppSettings {
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
         showListenTogetherButton.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_BUTTON, false)
+        dynamicIslandEnabled.value = prefs.getBoolean(KEY_DYNAMIC_ISLAND_ENABLED, true)
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
         onboardingComplete.value = prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false)
         diwaliGreetingShown.value = prefs.getBoolean(KEY_DIWALI_GREETING_SHOWN, false)
@@ -1403,6 +1407,11 @@ object AppSettings {
     fun setShowListenTogetherButton(value: Boolean) {
         showListenTogetherButton.value = value
         prefs.edit().putBoolean(KEY_LISTEN_TOGETHER_BUTTON, value).apply()
+    }
+
+    fun setDynamicIslandEnabled(value: Boolean) {
+        dynamicIslandEnabled.value = value
+        prefs.edit().putBoolean(KEY_DYNAMIC_ISLAND_ENABLED, value).apply()
     }
 
     fun setThemeMode(value: ThemeMode) {
@@ -2304,6 +2313,7 @@ object AppSettings {
     private const val KEY_DIWALI_GREETING_SHOWN = "diwali_greeting_2026_shown"
     private const val KEY_HIGH_PERFORMANCE_MODE = "high_performance_mode"
     private const val KEY_PERFORMANCE_REFRESH_RATE = "performance_refresh_rate"
+    private const val KEY_DYNAMIC_ISLAND_ENABLED = "dynamic_island_enabled"
     private const val KEY_STOP_ON_TASK_REMOVED = "stop_on_task_removed"
     private const val KEY_HIDE_VOLUME_BAR = "hide_volume_bar"
     private const val KEY_HIDE_STATUS_BAR_IN_PLAYER = "hide_status_bar_in_player"

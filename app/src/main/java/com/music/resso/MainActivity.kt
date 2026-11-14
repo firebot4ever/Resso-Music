@@ -196,6 +196,7 @@ import com.music.Resso.ui.screens.SourcesScreen
 import com.music.Resso.data.sources.TrackMatcher
 import com.music.Resso.ui.screens.SpotifyCanvasAuthScreen
 import com.music.Resso.ui.screens.SpotifyLibraryScreen
+import com.music.Resso.ui.components.DynamicIsland
 import com.music.Resso.data.spotify.SPOTIFY_PAGE_PREFIX
 import com.music.Resso.playback.AudioCache
 import com.music.Resso.playback.LinkRequest
@@ -922,6 +923,7 @@ private fun RessoApp(
     )
     val signedIn by viewModel.signedIn.collectAsStateWithLifecycle()
     val spotifyConnected by AppSettings.spotifySpdcToken.collectAsStateWithLifecycle()
+    val dynamicIslandEnabled by AppSettings.dynamicIslandEnabled.collectAsStateWithLifecycle()
     val isUserSignedIn = signedIn || spotifyConnected.isNotBlank()
     val incomingJamInvite by JamInviteLink.pending.collectAsStateWithLifecycle()
     var activeJamInviteCode by rememberSaveable { mutableStateOf<String?>(null) }
@@ -6047,6 +6049,22 @@ private fun RessoApp(
 
         // Over the page and its frosted bars, under nothing but the alerts.
         DacVolumeHud(hazeState)
+
+        // Universal Dynamic Island / Live Capsule for punch-hole camera playback controls
+        if (dynamicIslandEnabled && !playerRaised && player.song != null) {
+            DynamicIsland(
+                song = player.song,
+                isPlaying = player.isPlaying,
+                position = player.position,
+                durationMs = player.durationMs,
+                onPlayPause = {
+                    if (player.isPlaying) controller?.pause() else controller?.play()
+                },
+                onNext = { controller?.seekToNextMediaItem() },
+                onPrevious = { controller?.seekToPrevious() },
+                onOpenPlayer = { showNowPlaying = true },
+            )
+        }
 
         blockedAddonSong?.let { song ->
             AddonBlockedAlert(

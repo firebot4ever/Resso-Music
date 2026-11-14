@@ -243,6 +243,7 @@ fun SettingsScreen(
     val spatialAudio by AppSettings.spatialAudio.collectAsStateWithLifecycle()
     val nerdStats by AppSettings.showNerdStats.collectAsStateWithLifecycle()
     val listenTogetherButton by AppSettings.showListenTogetherButton.collectAsStateWithLifecycle()
+    val dynamicIslandEnabled by AppSettings.dynamicIslandEnabled.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val disableBlendEffects by AppSettings.disableBlendEffects.collectAsStateWithLifecycle()
@@ -886,6 +887,21 @@ fun SettingsScreen(
                         onClick = onEqualizer,
                     )
                 }
+            }
+            val dynamicIslandTitle = "Dynamic Island"
+            row(dynamicIslandTitle, "dynamic island", "capsule", "notch", "punch hole", "overlay", "island") {
+                SettingsRow(
+                    icon = SfIcons.PlayCircle,
+                    title = dynamicIslandTitle,
+                    subtitle = "Interactive playback pill around camera notch for quick song controls",
+                    trailing = {
+                        IosSwitch(
+                            checked = dynamicIslandEnabled,
+                            onCheckedChange = AppSettings::setDynamicIslandEnabled,
+                        )
+                    },
+                    onClick = { AppSettings.setDynamicIslandEnabled(!dynamicIslandEnabled) },
+                )
             }
         }
 
