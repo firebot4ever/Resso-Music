@@ -1314,6 +1314,9 @@ class PlaybackService : MediaLibraryService() {
                 .apply { setSmallIcon(R.drawable.ic_notification_logo) },
         )
 
+        // Initialize Floating Dynamic Island Overlay for Home screen background playback
+        com.music.Resso.ui.overlay.DynamicIslandOverlay.init(this)
+
         // Both the player screen and notification route their Shuffle command
         // here. Observe its state so either surface's icon follows the queue
         // edit once that single service-side transaction has completed.
@@ -6314,6 +6317,19 @@ class PlaybackService : MediaLibraryService() {
         MediaWidget.refresh(this)
         // The watch app follows the widget — same moments, same snapshot.
         WearBridge.publish(this, snapshot, reported, playing)
+
+        // Update Floating Dynamic Island System Overlay for Home screen
+        val isCurrentlyPlaying = playing ?: reported.playWhenReady
+        com.music.Resso.ui.overlay.DynamicIslandOverlay.updatePlayback(
+            context = this,
+            song = song,
+            isPlaying = isCurrentlyPlaying,
+            onPlayPause = {
+                if (reported.playWhenReady) reported.pause() else reported.play()
+            },
+            onNext = { reported.seekToNextMediaItem() },
+            onPrevious = { reported.seekToPreviousMediaItem() },
+        )
     }
 
     private var foreignCachePurgeJob: Job? = null
@@ -7849,6 +7865,7 @@ class PlaybackService : MediaLibraryService() {
 
 
     override fun onDestroy() {
+        com.music.Resso.ui.overlay.DynamicIslandOverlay.hideOverlay()
         WearBridge.attachStreams(null)
         WearBridge.releaseSpeaker()
         // Let go of the receiver's player but leave its session alone: a

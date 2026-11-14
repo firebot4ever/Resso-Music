@@ -888,19 +888,40 @@ fun SettingsScreen(
                     )
                 }
             }
-            val dynamicIslandTitle = "Dynamic Island"
+            val dynamicIslandTitle = "Dynamic Island (Home Screen)"
             row(dynamicIslandTitle, "dynamic island", "capsule", "notch", "punch hole", "overlay", "island") {
                 SettingsRow(
                     icon = SfIcons.PlayCircle,
                     title = dynamicIslandTitle,
-                    subtitle = "Interactive playback pill around camera notch for quick song controls",
+                    subtitle = "Floating capsule over Home screen when playing songs in background",
                     trailing = {
                         IosSwitch(
                             checked = dynamicIslandEnabled,
-                            onCheckedChange = AppSettings::setDynamicIslandEnabled,
+                            onCheckedChange = { checked ->
+                                AppSettings.setDynamicIslandEnabled(checked)
+                                if (checked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                                    context.startActivity(
+                                        Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${context.packageName}")
+                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            },
                         )
                     },
-                    onClick = { AppSettings.setDynamicIslandEnabled(!dynamicIslandEnabled) },
+                    onClick = {
+                        val next = !dynamicIslandEnabled
+                        AppSettings.setDynamicIslandEnabled(next)
+                        if (next && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
+                    },
                 )
             }
         }

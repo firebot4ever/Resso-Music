@@ -6048,22 +6048,6 @@ private fun RessoApp(
         // Over the page and its frosted bars, under nothing but the alerts.
         DacVolumeHud(hazeState)
 
-        // Universal Dynamic Island / Live Capsule for punch-hole camera playback controls
-        if (dynamicIslandEnabled && !playerRaised && player.song != null) {
-            DynamicIsland(
-                song = player.song,
-                isPlaying = player.isPlaying,
-                position = player.position,
-                durationMs = player.durationMs,
-                onPlayPause = {
-                    if (player.isPlaying) controller?.pause() else controller?.play()
-                },
-                onNext = { controller?.seekToNextMediaItem() },
-                onPrevious = { controller?.seekToPrevious() },
-                onOpenPlayer = { showNowPlaying = true },
-            )
-        }
-
         blockedAddonSong?.let { song ->
             AddonBlockedAlert(
                 hazeState = hazeState,
