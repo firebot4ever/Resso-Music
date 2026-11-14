@@ -947,11 +947,23 @@ private fun RessoApp(
         }
     }
     val account by viewModel.account.collectAsStateWithLifecycle()
+    val spotifyName by AppSettings.spotifyUserName.collectAsStateWithLifecycle()
+    val spotifyAvatar by AppSettings.spotifyUserAvatar.collectAsStateWithLifecycle()
     var spotifyAccount by remember { mutableStateOf<Account?>(null) }
-    LaunchedEffect(spotifyConnected) {
+    LaunchedEffect(spotifyConnected, spotifyName, spotifyAvatar) {
         if (spotifyConnected.isNotBlank()) {
+            val initialName = spotifyName.takeIf { it.isNotBlank() } ?: "Spotify User"
+            spotifyAccount = Account(
+                name = initialName,
+                email = "Spotify Connected",
+                thumbnailUrl = spotifyAvatar.takeIf { it.isNotBlank() },
+            )
             val sp = runCatching { SpotifyLibrary.me() }.getOrNull()
-            spotifyAccount = sp ?: Account(name = "Spotify User", email = "Spotify Connected", thumbnailUrl = null)
+            if (sp != null && sp.name.isNotBlank() && sp.name != "Spotify User") {
+                spotifyAccount = sp
+                AppSettings.setSpotifyUserName(sp.name)
+                sp.thumbnailUrl?.let { AppSettings.setSpotifyUserAvatar(it) }
+            }
         } else {
             spotifyAccount = null
         }
@@ -3459,7 +3471,7 @@ private fun RessoApp(
                                 recentlyPlayedLoading = homeRecentlyPlayedLoading && !hideRecents,
                                 topPicks = topPicks,
                                 topPicksLoading = topPicksLoading,
-                                listenerName = account?.name,
+                                listenerName = effectiveAccount?.name,
                                 // Neither shelf is drawn without its callback.
                                 onTopPickClick = openTopPick.takeUnless { hideTopPicks },
                                 onMoodClick = playMood.takeUnless { hideHomeMoods },
@@ -5888,8 +5900,11 @@ private fun RessoApp(
                     }
                     SpotifyLoginScreen(
                         modifier = Modifier.navigationBarsPadding(),
-                        onConnected = { token ->
+                        onConnected = { token, userName ->
                             AppSettings.setSpotifySpdcToken(token)
+                            if (!userName.isNullOrBlank()) {
+                                AppSettings.setSpotifyUserName(userName)
+                            }
                             showSpotifyLogin = false
                         },
                     )

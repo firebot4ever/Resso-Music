@@ -760,6 +760,8 @@ object AppSettings {
     val listenBrainzToken = MutableStateFlow("")
     val listenBrainzPrimaryArtistOnly = MutableStateFlow(false)
     val spotifySpdcToken = MutableStateFlow("")
+    val spotifyUserName = MutableStateFlow("")
+    val spotifyUserAvatar = MutableStateFlow("")
 
     // ── Discord Rich Presence ───────────────────────────────────────────
 
@@ -1097,6 +1099,8 @@ object AppSettings {
         listenBrainzToken.value = prefs.getString(KEY_LISTENBRAINZ_TOKEN, "").orEmpty()
         listenBrainzPrimaryArtistOnly.value = prefs.getBoolean(KEY_LISTENBRAINZ_PRIMARY_ARTIST_ONLY, false)
         spotifySpdcToken.value = prefs.getString(KEY_SPOTIFY_SPDC_TOKEN, "").orEmpty()
+        spotifyUserName.value = prefs.getString(KEY_SPOTIFY_USER_NAME, "").orEmpty()
+        spotifyUserAvatar.value = prefs.getString(KEY_SPOTIFY_USER_AVATAR, "").orEmpty()
         replayGenres.value = prefs.getBoolean(KEY_REPLAY_GENRES, true)
         filterNonMusicAudio.value = prefs.getBoolean(KEY_FILTER_NON_MUSIC_AUDIO, true)
         localMusicSort.value = readLocalMusicSort(KEY_LOCAL_MUSIC_SORT)
@@ -1777,6 +1781,16 @@ object AppSettings {
         SpotifyToken.invalidate()
     }
 
+    fun setSpotifyUserName(value: String) {
+        spotifyUserName.value = value
+        prefs.edit().putString(KEY_SPOTIFY_USER_NAME, value).apply()
+    }
+
+    fun setSpotifyUserAvatar(value: String) {
+        spotifyUserAvatar.value = value
+        prefs.edit().putString(KEY_SPOTIFY_USER_AVATAR, value).apply()
+    }
+
     fun setLastfmScrobbleEnabled(value: Boolean) {
         lastfmScrobbleEnabled.value = value
         if (!value) lastfmNowPlaying.value = false
@@ -2363,6 +2377,8 @@ object AppSettings {
     private const val KEY_LISTENBRAINZ_TOKEN = "listenbrainz_token"
     private const val KEY_LISTENBRAINZ_PRIMARY_ARTIST_ONLY = "listenbrainz_primary_artist_only"
     private const val KEY_SPOTIFY_SPDC_TOKEN = "spotify_spdc_token"
+    private const val KEY_SPOTIFY_USER_NAME = "spotify_user_name"
+    private const val KEY_SPOTIFY_USER_AVATAR = "spotify_user_avatar"
 
     private const val KEY_DISCORD_USERNAME = "discord_username"
     private const val KEY_DISCORD_NAME = "discord_name"

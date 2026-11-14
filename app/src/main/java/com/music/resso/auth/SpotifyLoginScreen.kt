@@ -80,6 +80,30 @@ fun clearSpotifyWebSession() {
     cookies.flush()
 }
 
+private const val JS_EXTRACT_USER = """
+    (function() {
+        try {
+            var s = document.getElementById('session');
+            if (s) {
+                var d = JSON.parse(s.textContent || s.innerText);
+                if (d && d.user) {
+                    var n = d.user.displayName || d.user.name || d.user.username;
+                    if (n) return n;
+                }
+            }
+            var b = document.querySelector('[data-testid="user-widget-link"]') ||
+                    document.querySelector('button[data-testid="user-widget-dropdown-button"]');
+            if (b) {
+                var l = b.getAttribute('aria-label') || b.innerText || '';
+                if (l.trim()) return l.trim();
+            }
+            var u = document.getElementById('login-username');
+            if (u && u.value) return u.value;
+        } catch(e) {}
+        return '';
+    })()
+"""
+
 /**
  * In-app Spotify sign-in. Lets the real accounts.spotify.com page handle the
  * login, then hands the `sp_dc` cookie to [onConnected] once the page lands on
@@ -94,21 +118,34 @@ fun clearSpotifyWebSession() {
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SpotifyLoginScreen(
-    onConnected: (String) -> Unit,
+    onConnected: (token: String, userName: String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var sent by remember { mutableStateOf(false) }
 
+    val deliverToken = { view: WebView?, token: String ->
+        if (!sent) {
+            sent = true
+            view?.visibility = View.GONE
+            if (view != null) {
+                view.evaluateJavascript(JS_EXTRACT_USER) { rawName ->
+                    val clean = rawName?.trim('"', ' ', '\n', '\r')?.takeIf { it.isNotBlank() && it != "null" }
+                    onConnected(token, clean)
+                }
+            } else {
+                onConnected(token, null)
+            }
+        }
+    }
+
     LaunchedEffect(sent) {
         if (sent) return@LaunchedEffect
         while (true) {
             val token = extractSpdcToken()
             if (token != null) {
-                sent = true
-                webView?.visibility = View.GONE
-                onConnected(token)
+                deliverToken(webView, token)
                 break
             }
             delay(350L)
@@ -134,9 +171,7 @@ fun SpotifyLoginScreen(
                     if (!sent) {
                         val token = extractSpdcToken()
                         if (token != null) {
-                            sent = true
-                            view.visibility = View.GONE
-                            onConnected(token)
+                            deliverToken(view, token)
                         } else if (url?.startsWith("https://open.spotify.com") == true) {
                             // If landed on open.spotify.com before token read, hide webview so playback disabled is not visible
                             view.visibility = View.GONE

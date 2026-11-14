@@ -103,7 +103,7 @@ fun AmbientPlayer(np: NowPlaying, ambient: Ambient) {
         }
         // The Home page's mark, as Spotify keeps its own at the foot of the AOD.
         Icon(
-            painter = painterResource(R.drawable.ic_logo),
+            painter = painterResource(R.drawable.ic_notification),
             contentDescription = null,
             tint = secondary,
             modifier = Modifier

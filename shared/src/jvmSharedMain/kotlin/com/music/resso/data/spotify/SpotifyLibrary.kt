@@ -171,20 +171,66 @@ object SpotifyLibrary {
      */
     suspend fun me(): Account? = withContext(Dispatchers.IO) {
         val headers = runCatching { authHeaders() }.getOrNull() ?: return@withContext null
-        val request = Request.Builder()
-            .url("https://api.spotify.com/v1/me")
-            .get()
-            .apply { headers.forEach { (name, value) -> header(name, value) } }
-            .build()
+
+        // 1. Try GraphQL libraryV3 me root and playlists owner
+        val fromGql = runCatching {
+            val variables = buildJsonObject {
+                putJsonArray("filters") { add("Playlists") }
+                put("order", null as String?)
+                put("textFilter", "")
+                putJsonArray("features") {
+                    add("LIKED_SONGS")
+                    add("YOUR_EPISODES_V2")
+                    add("PRERELEASES")
+                    add("EVENTS")
+                }
+                put("limit", 20)
+                put("offset", 0)
+                put("flatten", true)
+                putJsonArray("expandedFolders") {}
+                put("folderUri", null as String?)
+                put("includeFoldersWhenFlattening", false)
+            }
+            val root = gql("libraryV3", LIBRARY, variables, headers)
+            val meData = root.obj("data")?.obj("me")
+
+            val profile = meData?.obj("profile")
+            val displayName = profile?.str("displayName") ?: profile?.str("name")
+            val avatar = largestSource(profile?.obj("avatar")) ?: largestSource(profile?.obj("images"))
+            if (!displayName.isNullOrBlank()) {
+                return@runCatching Account(name = displayName, email = "Spotify Connected", thumbnailUrl = avatar)
+            }
+
+            val rawItems = meData?.obj("libraryV3")?.arr("items").orEmpty()
+            for (element in rawItems) {
+                val data = element.jsonObject.obj("item")?.obj("data") ?: continue
+                val ownerName = data.obj("ownerV2")?.obj("data")?.str("name")
+                if (!ownerName.isNullOrBlank() && ownerName != "Spotify") {
+                    return@runCatching Account(name = ownerName, email = "Spotify Connected", thumbnailUrl = null)
+                }
+            }
+            null
+        }.getOrNull()
+
+        if (fromGql != null) return@withContext fromGql
+
+        // 2. Fallback: try REST /v1/me
         runCatching {
+            val request = Request.Builder()
+                .url("https://api.spotify.com/v1/me")
+                .get()
+                .apply { headers.forEach { (name, value) -> header(name, value) } }
+                .build()
             Http.client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use null
                 val payload = response.body?.string().orEmpty()
                 val root = json.parseToJsonElement(payload).jsonObject
-                val name = root.str("display_name") ?: root.str("id") ?: "Spotify User"
+                val name = root.str("display_name") ?: root.str("id")
                 val email = root.str("email") ?: "Spotify Account"
                 val photo = root.arr("images")?.firstOrNull()?.jsonObject?.str("url")
-                Account(name = name, email = email, thumbnailUrl = photo)
+                if (!name.isNullOrBlank()) {
+                    Account(name = name, email = email, thumbnailUrl = photo)
+                } else null
             }
         }.getOrNull()
     }
