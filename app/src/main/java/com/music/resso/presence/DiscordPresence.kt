@@ -126,8 +126,6 @@ object DiscordPresence {
                     else -> title
                 }
                 put("large_text", largeText)
-                put("small_image", APP_LOGO_URL)
-                put("small_text", "Resso")
             })
 
             put("instance", JsonPrimitive(true))

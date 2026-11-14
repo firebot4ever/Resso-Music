@@ -290,9 +290,6 @@ import com.music.Resso.ui.screens.SegmentedControl
 import com.music.Resso.ui.components.SearchField
 import com.music.Resso.sharedui.resources.Res as SharedRes
 import com.music.Resso.sharedui.resources.ic_logo
-import com.music.Resso.sharedui.resources.spotify_logo
-import coil3.compose.AsyncImage
-import androidx.compose.ui.layout.ContentScale
 import com.music.Resso.sharedui.resources.search_hint
 import com.music.Resso.sharedui.resources.search_addons_hint
 import com.music.Resso.sharedui.resources.search_library_hint
@@ -3965,58 +3962,34 @@ private fun RessoApp(
                         selectedTab == TAB_HOME && route == null && detail == null && selectedMoodGenre == null
                     ) {
                         {
-                            if (!signedIn && spotifyConnected.isNotBlank()) {
-                                val avatar = spotifyAvatar.takeIf { it.isNotBlank() }
-                                if (avatar != null) {
-                                    AsyncImage(
-                                        model = avatar,
-                                        contentDescription = "Spotify Profile",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(CircleShape)
-                                            .clickable { showAccountSelector = true },
-                                    )
-                                } else {
-                                    Icon(
-                                        painter = painterResource(SharedRes.drawable.spotify_logo),
-                                        contentDescription = "Spotify Profile",
-                                        tint = Color(0xFF1DB954),
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clickable { showAccountSelector = true },
-                                    )
-                                }
-                            } else {
-                                val logoModifier = Modifier
-                                    .height(36.dp)
-                                    .aspectRatio(492f / 452f)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                    ) {
-                                        if (diwaliFestive) {
-                                            showDiwali = true
-                                        } else {
-                                            scope.launch {
-                                                homeListState.animateScrollToItem(0)
-                                            }
+                            val logoModifier = Modifier
+                                .height(36.dp)
+                                .aspectRatio(492f / 452f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {
+                                    if (diwaliFestive) {
+                                        showDiwali = true
+                                    } else {
+                                        scope.launch {
+                                            homeListState.animateScrollToItem(0)
                                         }
                                     }
-                                if (diwaliFestive) {
-                                    GoldenLogo(
-                                        painter = painterResource(SharedRes.drawable.ic_logo),
-                                        modifier = logoModifier,
-                                        onClick = { showDiwali = true },
-                                    )
-                                } else {
-                                    Icon(
-                                        painter = painterResource(SharedRes.drawable.ic_logo),
-                                        contentDescription = "Resso",
-                                        tint = Color.Unspecified,
-                                        modifier = logoModifier,
-                                    )
                                 }
+                            if (diwaliFestive) {
+                                GoldenLogo(
+                                    painter = painterResource(SharedRes.drawable.ic_logo),
+                                    modifier = logoModifier,
+                                    onClick = { showDiwali = true },
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(SharedRes.drawable.ic_logo),
+                                    contentDescription = "Resso",
+                                    tint = Color.Unspecified,
+                                    modifier = logoModifier,
+                                )
                             }
                         }
                     } else null,
