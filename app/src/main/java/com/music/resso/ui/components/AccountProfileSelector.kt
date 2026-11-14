@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.layout.ContentScale
 import org.jetbrains.compose.resources.painterResource
 import com.music.Resso.sharedui.resources.Res as SharedRes
 import com.music.Resso.sharedui.resources.spotify_logo
@@ -220,11 +221,12 @@ private fun SpotifyProfileRow(
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (account.thumbnailUrl != null) {
+        if (!account.thumbnailUrl.isNullOrBlank()) {
             AsyncImage(
-                account.thumbnailUrl,
-                null,
-                Modifier.size(38.dp).clip(MaterialTheme.shapes.extraLarge),
+                model = account.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(38.dp).clip(CircleShape),
             )
         } else {
             Box(

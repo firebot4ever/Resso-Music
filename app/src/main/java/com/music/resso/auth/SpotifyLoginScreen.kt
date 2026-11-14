@@ -83,22 +83,37 @@ fun clearSpotifyWebSession() {
 private const val JS_EXTRACT_USER = """
     (function() {
         try {
+            var name = '';
+            var avatar = '';
             var s = document.getElementById('session');
             if (s) {
                 var d = JSON.parse(s.textContent || s.innerText);
                 if (d && d.user) {
-                    var n = d.user.displayName || d.user.name || d.user.username;
-                    if (n) return n;
+                    name = d.user.displayName || d.user.name || d.user.username || '';
+                    if (d.user.images && d.user.images.length > 0) {
+                        avatar = d.user.images[0].url || '';
+                    }
                 }
             }
-            var b = document.querySelector('[data-testid="user-widget-link"]') ||
-                    document.querySelector('button[data-testid="user-widget-dropdown-button"]');
-            if (b) {
-                var l = b.getAttribute('aria-label') || b.innerText || '';
-                if (l.trim()) return l.trim();
+            if (!avatar) {
+                var img = document.querySelector('img[data-testid="user-widget-avatar"]') ||
+                          document.querySelector('button[data-testid="user-widget-dropdown-button"] img') ||
+                          document.querySelector('a[data-testid="user-widget-link"] img') ||
+                          document.querySelector('figure[data-testid="user-widget-avatar"] img');
+                if (img && img.src) avatar = img.src;
             }
-            var u = document.getElementById('login-username');
-            if (u && u.value) return u.value;
+            if (!name) {
+                var b = document.querySelector('[data-testid="user-widget-link"]') ||
+                        document.querySelector('button[data-testid="user-widget-dropdown-button"]');
+                if (b) {
+                    name = b.getAttribute('aria-label') || b.innerText || '';
+                }
+            }
+            if (!name) {
+                var u = document.getElementById('login-username');
+                if (u && u.value) name = u.value;
+            }
+            return JSON.stringify({ name: (name || '').trim(), avatar: (avatar || '').trim() });
         } catch(e) {}
         return '';
     })()
@@ -118,7 +133,7 @@ private const val JS_EXTRACT_USER = """
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SpotifyLoginScreen(
-    onConnected: (token: String, userName: String?) -> Unit,
+    onConnected: (token: String, userName: String?, userAvatar: String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -130,12 +145,22 @@ fun SpotifyLoginScreen(
             sent = true
             view?.visibility = View.GONE
             if (view != null) {
-                view.evaluateJavascript(JS_EXTRACT_USER) { rawName ->
-                    val clean = rawName?.trim('"', ' ', '\n', '\r')?.takeIf { it.isNotBlank() && it != "null" }
-                    onConnected(token, clean)
+                view.evaluateJavascript(JS_EXTRACT_USER) { rawResult ->
+                    val cleanStr = rawResult?.trim().orEmpty()
+                    val unescaped = if (cleanStr.startsWith("\"") && cleanStr.endsWith("\"") && cleanStr.length >= 2) {
+                        try {
+                            org.json.JSONTokener(cleanStr).nextValue() as? String ?: cleanStr
+                        } catch (_: Throwable) {
+                            cleanStr.removeSurrounding("\"").replace("\\\"", "\"")
+                        }
+                    } else cleanStr
+                    val json = runCatching { org.json.JSONObject(unescaped) }.getOrNull()
+                    val cleanName = json?.optString("name")?.trim()?.takeIf { it.isNotBlank() && it != "null" }
+                    val cleanAvatar = json?.optString("avatar")?.trim()?.takeIf { it.isNotBlank() && it != "null" }
+                    onConnected(token, cleanName, cleanAvatar)
                 }
             } else {
-                onConnected(token, null)
+                onConnected(token, null, null)
             }
         }
     }

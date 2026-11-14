@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import org.jetbrains.compose.resources.painterResource
@@ -83,22 +84,42 @@ fun SpotifyLibraryScreen(
         contentPadding = contentPadding,
     ) {
         item {
+            val spotifyName by AppSettings.spotifyUserName.collectAsStateWithLifecycle()
+            val spotifyAvatar by AppSettings.spotifyUserAvatar.collectAsStateWithLifecycle()
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 14.dp),
             ) {
-                Icon(
-                    painter = painterResource(Res.drawable.spotify_logo),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(38.dp),
-                )
+                if (cookie.isNotBlank() && spotifyAvatar.isNotBlank()) {
+                    AsyncImage(
+                        model = spotifyAvatar,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(38.dp).clip(CircleShape),
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(Res.drawable.spotify_logo),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(38.dp),
+                    )
+                }
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    text = stringResource(R.string.spotify),
-                    style = MaterialTheme.typography.displayLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
+                Column {
+                    Text(
+                        text = stringResource(R.string.spotify),
+                        style = MaterialTheme.typography.displayLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    if (cookie.isNotBlank() && spotifyName.isNotBlank()) {
+                        Text(
+                            text = spotifyName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
         if (cookie.isBlank()) {

@@ -196,26 +196,29 @@ object SpotifyLibrary {
 
             val profile = meData?.obj("profile")
             val displayName = profile?.str("displayName") ?: profile?.str("name")
-            val avatar = largestSource(profile?.obj("avatar")) ?: largestSource(profile?.obj("images"))
+            val avatar = extractAvatar(profile)
             if (!displayName.isNullOrBlank()) {
-                return@runCatching Account(name = displayName, email = "Spotify Connected", thumbnailUrl = avatar)
-            }
-
-            val rawItems = meData?.obj("libraryV3")?.arr("items").orEmpty()
-            for (element in rawItems) {
-                val data = element.jsonObject.obj("item")?.obj("data") ?: continue
-                val ownerName = data.obj("ownerV2")?.obj("data")?.str("name")
-                if (!ownerName.isNullOrBlank() && ownerName != "Spotify") {
-                    return@runCatching Account(name = ownerName, email = "Spotify Connected", thumbnailUrl = null)
+                Account(name = displayName, email = "Spotify Connected", thumbnailUrl = avatar)
+            } else {
+                val rawItems = meData?.obj("libraryV3")?.arr("items").orEmpty()
+                var fallbackAccount: Account? = null
+                for (element in rawItems) {
+                    val data = element.jsonObject.obj("item")?.obj("data") ?: continue
+                    val ownerName = data.obj("ownerV2")?.obj("data")?.str("name")
+                    if (!ownerName.isNullOrBlank() && ownerName != "Spotify") {
+                        fallbackAccount = Account(name = ownerName, email = "Spotify Connected", thumbnailUrl = null)
+                        break
+                    }
                 }
+                fallbackAccount
             }
-            null
         }.getOrNull()
 
-        if (fromGql != null) return@withContext fromGql
+        // If GraphQL already resolved both display name and avatar, return right away
+        if (fromGql != null && !fromGql.thumbnailUrl.isNullOrBlank()) return@withContext fromGql
 
-        // 2. Fallback: try REST /v1/me
-        runCatching {
+        // 2. Fetch or supplement with REST /v1/me
+        val fromRest = runCatching {
             val request = Request.Builder()
                 .url("https://api.spotify.com/v1/me")
                 .get()
@@ -227,12 +230,52 @@ object SpotifyLibrary {
                 val root = json.parseToJsonElement(payload).jsonObject
                 val name = root.str("display_name") ?: root.str("id")
                 val email = root.str("email") ?: "Spotify Account"
-                val photo = root.arr("images")?.firstOrNull()?.jsonObject?.str("url")
+                val images = root.arr("images")
+                val photo = images?.mapNotNull { s ->
+                    val u = s.jsonObject.str("url") ?: return@mapNotNull null
+                    u to (s.jsonObject.int("width") ?: 0)
+                }?.maxByOrNull { it.second }?.first ?: images?.firstOrNull()?.jsonObject?.str("url")
                 if (!name.isNullOrBlank()) {
                     Account(name = name, email = email, thumbnailUrl = photo)
                 } else null
             }
         }.getOrNull()
+
+        if (fromRest != null) {
+            val resolvedName = fromGql?.name?.takeIf { it.isNotBlank() } ?: fromRest.name
+            val resolvedAvatar = fromRest.thumbnailUrl ?: fromGql?.thumbnailUrl
+            return@withContext Account(
+                name = resolvedName,
+                email = "Spotify Connected",
+                thumbnailUrl = resolvedAvatar,
+            )
+        }
+
+        fromGql
+    }
+
+    private fun extractAvatar(profile: JsonObject?): String? {
+        if (profile == null) return null
+        val avatarObj = profile.obj("avatar")
+        if (avatarObj != null) {
+            avatarObj.str("url")?.takeIf { it.isNotBlank() }?.let { return it }
+            val sources = avatarObj.arr("sources")
+                ?: avatarObj.arr("items")?.firstOrNull()?.jsonObject?.arr("sources")
+            val best = sources?.mapNotNull { s ->
+                val u = s.jsonObject.str("url") ?: return@mapNotNull null
+                u to (s.jsonObject.int("width") ?: 0)
+            }?.maxByOrNull { it.second }?.first
+            if (!best.isNullOrBlank()) return best
+        }
+        val imagesArr = profile.arr("images")
+        if (imagesArr != null) {
+            val best = imagesArr.mapNotNull { s ->
+                val u = s.jsonObject.str("url") ?: return@mapNotNull null
+                u to (s.jsonObject.int("width") ?: 0)
+            }.maxByOrNull { it.second }?.first
+            if (!best.isNullOrBlank()) return best
+        }
+        return largestSource(profile.obj("images"))
     }
 
     private fun likedPage(headers: Map<String, String>, offset: Int): Triple<List<SpotifyTrack>, Int, Int> {
@@ -368,14 +411,17 @@ internal fun parseLikedPage(root: JsonObject): Triple<List<SpotifyTrack>, Int, I
  * sizes in no fixed order — a 60px thumbnail can come last — so the list is
  * read by width rather than by position.
  */
-private fun largestSource(images: JsonObject?): String? =
-    images?.arr("items")?.firstOrNull()?.jsonObject?.arr("sources")
-        ?.mapNotNull { source ->
-            val url = source.jsonObject.str("url") ?: return@mapNotNull null
-            url to (source.jsonObject.int("width") ?: 0)
-        }
-        ?.maxByOrNull { it.second }
-        ?.first
+private fun largestSource(images: JsonObject?): String? {
+    if (images == null) return null
+    images.str("url")?.takeIf { it.isNotBlank() }?.let { return it }
+    val sources = images.arr("sources")
+        ?: images.arr("items")?.firstOrNull()?.jsonObject?.arr("sources")
+        ?: return null
+    return sources.mapNotNull { source ->
+        val url = source.jsonObject.str("url") ?: return@mapNotNull null
+        url to (source.jsonObject.int("width") ?: 0)
+    }.maxByOrNull { it.second }?.first
+}
 
 private fun coverUrl(images: JsonObject?): String? = largestSource(images)
 

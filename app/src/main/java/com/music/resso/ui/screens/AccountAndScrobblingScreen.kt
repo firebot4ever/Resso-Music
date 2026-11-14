@@ -3,6 +3,11 @@ package com.music.Resso.ui.screens
 import com.music.Resso.ui.icons.SfIcons
 import com.music.Resso.auth.clearSpotifyWebSession
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.material3.HorizontalDivider
 import com.music.Resso.sharedui.resources.Res
 import com.music.Resso.sharedui.resources.spotify_logo
@@ -105,9 +110,23 @@ fun AccountAndScrobblingScreen(
             header = stringResource(R.string.spotify),
             footer = stringResource(R.string.spotify_connect_subtitle),
         ) {
+            val spotifyName by AppSettings.spotifyUserName.collectAsStateWithLifecycle()
+            val spotifyAvatar by AppSettings.spotifyUserAvatar.collectAsStateWithLifecycle()
+            val hasSpotifyAvatar = spotifyConnected.isNotBlank() && spotifyAvatar.isNotBlank()
             SettingsRow(
-                iconPainter = painterResource(Res.drawable.spotify_logo),
-                title = stringResource(R.string.spotify),
+                icon = null,
+                iconPainter = if (hasSpotifyAvatar) null else painterResource(Res.drawable.spotify_logo),
+                iconContent = if (hasSpotifyAvatar) {
+                    {
+                        AsyncImage(
+                            model = spotifyAvatar,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(ICON_SIZE).clip(CircleShape),
+                        )
+                    }
+                } else null,
+                title = if (spotifyConnected.isNotBlank() && spotifyName.isNotBlank()) spotifyName else stringResource(R.string.spotify),
                 subtitle = stringResource(
                     if (spotifyConnected.isNotBlank()) R.string.connected else R.string.tap_to_connect,
                 ),
@@ -120,6 +139,8 @@ fun AccountAndScrobblingScreen(
                     onClick = {
                         clearSpotifyWebSession()
                         AppSettings.setSpotifySpdcToken("")
+                        AppSettings.setSpotifyUserName("")
+                        AppSettings.setSpotifyUserAvatar("")
                     },
                 )
             }

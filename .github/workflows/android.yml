@@ -84,8 +84,8 @@ jobs:
         generate_release_notes: false
         body: |
           ### What's New:
+          - Spotify account profile photo and user display
           - Home Screen Floating Dynamic Island (Camera punch hole & expanded playback controls)
           - In-App Direct APK Updater (Installs automatically without opening browser)
           - Fixed Package Installer integration for Android 10+
-          - Spotify account name integration
           - Performance and playback stability improvements

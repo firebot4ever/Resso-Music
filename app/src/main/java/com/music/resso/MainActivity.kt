@@ -962,9 +962,10 @@ private fun RessoApp(
             )
             val sp = runCatching { SpotifyLibrary.me() }.getOrNull()
             if (sp != null && sp.name.isNotBlank() && sp.name != "Spotify User") {
-                spotifyAccount = sp
+                val resolvedAvatar = sp.thumbnailUrl ?: spotifyAvatar.takeIf { it.isNotBlank() }
+                spotifyAccount = sp.copy(thumbnailUrl = resolvedAvatar)
                 AppSettings.setSpotifyUserName(sp.name)
-                sp.thumbnailUrl?.let { AppSettings.setSpotifyUserAvatar(it) }
+                resolvedAvatar?.let { AppSettings.setSpotifyUserAvatar(it) }
             }
         } else {
             spotifyAccount = null
@@ -5907,10 +5908,13 @@ private fun RessoApp(
                     }
                     SpotifyLoginScreen(
                         modifier = Modifier.navigationBarsPadding(),
-                        onConnected = { token, userName ->
+                        onConnected = { token, userName, userAvatar ->
                             AppSettings.setSpotifySpdcToken(token)
                             if (!userName.isNullOrBlank()) {
                                 AppSettings.setSpotifyUserName(userName)
+                            }
+                            if (!userAvatar.isNullOrBlank()) {
+                                AppSettings.setSpotifyUserAvatar(userAvatar)
                             }
                             showSpotifyLogin = false
                         },
