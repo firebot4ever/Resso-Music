@@ -25,7 +25,6 @@ object DiscordPresence {
 
     const val PROJECT_URL = "https://github.com/firebot4ever/Resso"
     const val DEFAULT_BUTTON_1 = "Listen on YouTube Music"
-    const val DEFAULT_BUTTON_2 = "Visit Resso"
 
     /** Discord truncates nothing for us: over-long fields are dropped. */
     const val MAX_FIELD = 120
@@ -133,7 +132,7 @@ object DiscordPresence {
 
             val buttons = mutableListOf<JsonObject>()
             if (button1Visible) {
-                val defaultLabel = if (isSpotify) "Play on Spotify" else DEFAULT_BUTTON_1
+                val defaultLabel = if (isSpotify) "Play on Resso" else DEFAULT_BUTTON_1
                 val defaultUrl = if (isSpotify) {
                     val encoded = runCatching { java.net.URLEncoder.encode("${song.title} ${song.artist}", "UTF-8") }.getOrDefault("")
                     "https://open.spotify.com/search/$encoded"

@@ -31,8 +31,7 @@ export const APPLICATION_ID = '1543679166967193620';
 const GATEWAY = 'wss://gateway.discord.gg/?v=9&encoding=json';
 const API = 'https://discord.com/api/v9';
 const PROJECT_URL = 'https://github.com/firebot4ever/Resso';
-const DEFAULT_BUTTON_1 = 'Listen on YouTube Music';
-const DEFAULT_BUTTON_2 = 'Visit Resso';
+const DEFAULT_BUTTON_1 = 'Listen on Resso';
 const APP_NAME = 'Resso';
 
 const INITIAL_RECONNECT_MS = 1_000;
@@ -406,7 +405,6 @@ export async function buildPresence(token: string, track: DiscordNowPlaying, opt
   const watchUrl = `https://music.youtube.com/watch?v=${track.videoId}`;
   const buttons: [string, string][] = [];
   if (options.button1Visible) buttons.push([resolveVariables(options.button1Text || DEFAULT_BUTTON_1, track), watchUrl]);
-  if (options.button2Visible) buttons.push([resolveVariables(options.button2Text || DEFAULT_BUTTON_2, track), PROJECT_URL]);
   const art = track.artworkUrl?.startsWith('http') ? track.artworkUrl : null;
   // An unreachable mirror keeps the raw URL, as RpcImage.ExternalImage does.
   const largeImage = art ? ((await externalAsset(token, art)) ?? art) : null;

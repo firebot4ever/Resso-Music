@@ -242,7 +242,6 @@ export function DiscordSettings() {
                 <span>Resso button text</span>
                 <input
                   className={settingsUi.input}
-                  placeholder="Visit Resso"
                   value={options.button2Text}
                   onChange={(e) => set({ button2Text: e.currentTarget.value })}
                 />
