@@ -41,8 +41,8 @@ buildscript {
  * No "v" in the name — the in-app updater reads it as a number; the "v" is the
  * release tag's alone.
  */
-extra["RessoVersionCode"] = 41
-extra["RessoVersionName"] = "1.9.5"
+extra["RessoVersionCode"] = 42
+extra["RessoVersionName"] = "1.9.6"
 
 /*
  * Bump this by hand before cutting each sideloaded test build ("beta2",

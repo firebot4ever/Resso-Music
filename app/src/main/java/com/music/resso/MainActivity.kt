@@ -5542,7 +5542,14 @@ private fun RessoApp(
                     },
                     onInstall = {
                         val ready = AppUpdateChecker.download.value as? AppUpdateChecker.DownloadState.Ready
-                        ready?.let { AppUpdateChecker.installApk(context, it.file) }
+                        if (ready != null) {
+                            AppUpdateChecker.installApk(context, ready.file)
+                        } else {
+                            val apkUrl = update.apkUrl
+                                ?: "https://github.com/firebot4ever/Resso-Music/releases/download/v${update.version}/Resso-v${update.version}.apk"
+                            val effectiveUpdate = update.copy(apkUrl = apkUrl)
+                            scope.launch { AppUpdateChecker.downloadApk(context, effectiveUpdate) }
+                        }
                     },
                     onOpenReleasePage = {
                         AppUpdateChecker.resetDownload()

@@ -2,9 +2,11 @@ package com.music.Resso.data
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.music.Resso.BuildConfig
 import kotlinx.coroutines.Dispatchers
@@ -90,6 +92,8 @@ object AppUpdateChecker {
      * out whether a leftover file is still good.
      */
     suspend fun clearCache(context: Context) = withContext(Dispatchers.IO) {
+        val baseDir = context.externalCacheDir ?: context.cacheDir
+        File(baseDir, CACHE_SUBDIR).listFiles()?.forEach { it.delete() }
         File(context.cacheDir, CACHE_SUBDIR).listFiles()?.forEach { it.delete() }
     }
 
@@ -139,8 +143,10 @@ object AppUpdateChecker {
         downloadCancelled = false
         _download.value = DownloadState.Downloading(0f)
 
-        runCatching {
-            val dir = File(context.cacheDir, CACHE_SUBDIR).apply { mkdirs() }
+        var downloadedFile: File? = null
+        val downloadSuccess = runCatching {
+            val baseDir = context.externalCacheDir ?: context.cacheDir
+            val dir = File(baseDir, CACHE_SUBDIR).apply { mkdirs() }
             // Drop anything left over from an earlier attempt.
             dir.listFiles()?.forEach { it.delete() }
             val target = File(dir, "Resso-${info.version}.apk")
@@ -172,16 +178,24 @@ object AppUpdateChecker {
                     }
                 }
             }
+            target.setReadable(true, false)
+            downloadedFile = target
             _download.value = DownloadState.Ready(target)
-            // Automatically launch system package installer immediately upon download completion
-            withContext(Dispatchers.Main) {
-                installApk(context, target)
-            }
-        }.onFailure { error ->
+            true
+        }.getOrElse { error ->
             _download.value = if (downloadCancelled) {
                 DownloadState.Idle
             } else {
                 DownloadState.Failed(error.message ?: "Download failed")
+            }
+            false
+        }
+
+        if (downloadSuccess && downloadedFile != null) {
+            withContext(Dispatchers.Main) {
+                runCatching {
+                    installApk(context, downloadedFile!!)
+                }
             }
         }
     }
@@ -199,16 +213,25 @@ object AppUpdateChecker {
     /**
      * Hands a downloaded APK to the system installer.
      *
-     * Sideloaded apps need the user's blessing per app ("install unknown apps");
-     * without it the installer intent silently does nothing on most ROMs, so
-     * the user is sent to that one switch first and taps Install again after.
-     * Some TV builds have no such settings screen; there the installer is
-     * launched anyway and shows its own "not allowed" prompt with a way in.
+     * Modern Android requires [Intent.ACTION_VIEW] with "application/vnd.android.package-archive"
+     * and explicit URI permission grant via FileProvider.
      */
     fun installApk(context: Context, file: File) {
+        if (!file.exists() || file.length() <= 0L) {
+            Toast.makeText(context, "Update package not found. Please try downloading again.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        file.setReadable(true, false)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()
         ) {
+            Toast.makeText(
+                context,
+                "Please enable 'Install unknown apps' permission to install the update",
+                Toast.LENGTH_LONG,
+            ).show()
             val opened = runCatching {
                 context.startActivity(
                     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
@@ -218,17 +241,45 @@ object AppUpdateChecker {
             }.isSuccess
             if (opened) return
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        context.startActivity(
-            Intent(Intent.ACTION_INSTALL_PACKAGE)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                .putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                .addFlags(
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_ACTIVITY_NEW_TASK,
-                ),
-        )
+
+        try {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+
+            // Explicitly grant read URI permissions to all matching activities
+            val resInfoList = context.packageManager.queryIntentActivities(
+                intent,
+                PackageManager.MATCH_DEFAULT_ONLY,
+            )
+            for (resolveInfo in resInfoList) {
+                val pkgName = resolveInfo.activityInfo.packageName
+                context.grantUriPermission(pkgName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("AppUpdateChecker", "Failed to launch package installer", e)
+            try {
+                // Direct fallback
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(fallbackIntent)
+            } catch (fallbackEx: Exception) {
+                Toast.makeText(
+                    context,
+                    "Failed to launch installer: ${fallbackEx.localizedMessage ?: e.localizedMessage}",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
     }
 
     /** A version split into its numeric dotted parts and whether it carries a "-suffix" (e.g. "-beta2"). */
