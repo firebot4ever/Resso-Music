@@ -14,13 +14,14 @@ window.addEventListener('message', async (event) => {
       {
         channel: 'Resso-bridge',
         protocol: 1,
-        direction: 'from-extension',
+        direction: 'to-page',
         id,
         ok: true,
         result: {
-          version: '2.0.2',
-          family: 'chromium',
-          capabilities: ['yt', 'yt.auth', 'yt.stats', 'addon', 'lyrics', 'spotify', 'discord'],
+          version: '2.1.0',
+          protocol: 1,
+          browser: 'chromium',
+          capabilities: ['yt', 'yt.auth', 'yt.stats', 'lyrics', 'spotify', 'discord'],
         },
       },
       '*',
@@ -34,7 +35,7 @@ window.addEventListener('message', async (event) => {
       {
         channel: 'Resso-bridge',
         protocol: 1,
-        direction: 'from-extension',
+        direction: 'to-page',
         id,
         ok: true,
         result,
@@ -46,11 +47,11 @@ window.addEventListener('message', async (event) => {
       {
         channel: 'Resso-bridge',
         protocol: 1,
-        direction: 'from-extension',
+        direction: 'to-page',
         id,
         ok: false,
         error: {
-          code: 'call_failed',
+          code: err?.code || 'internal',
           message: err?.message || 'Bridge call failed',
         },
       },
@@ -61,7 +62,6 @@ window.addEventListener('message', async (event) => {
 
 // Handle media controls from main process
 ipcRenderer.on('media:toggle', () => {
-  // Simulate spacebar or media session toggle
   if (navigator.mediaSession && (navigator.mediaSession as any).playbackState) {
     const event = new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true });
     window.dispatchEvent(event);

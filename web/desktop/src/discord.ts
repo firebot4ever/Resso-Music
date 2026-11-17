@@ -1,6 +1,6 @@
 import * as net from 'net';
 
-const CLIENT_ID = '1198270188737339463';
+const CLIENT_ID = '1543679166967193620';
 
 enum Opcode {
   HANDSHAKE = 0,
