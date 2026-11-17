@@ -9,6 +9,6 @@ call pnpm dist
 echo.
 echo ============================================
 echo   Build Complete!
-echo   Setup file: web\desktop\dist-package\Resso Setup 2.0.2.exe
+echo   Setup file is located in: web\desktop\dist-package\
 echo ============================================
 pause
