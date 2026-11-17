@@ -88,7 +88,42 @@ jobs:
           ### What's New:
           - Native Spotify Home Screen: If logged in with Spotify, Home transforms into a full Spotify home view (2-column Quick Access grid, Liked Songs, Made For You mixes with Spotify badge, and Your Playlists)
           - Spotify Profile Photo: Real-time profile photo display in the top bar and account screen with automatic retry fetching
-          - Discord Rich Presence: Replaced missing asset dice with official Resso app logo on player card, and removed buttons for a sleek look
+          - Discord Rich Presence: Sleek player card with live timer and track info
           - Full Multi-Color App Theme Customizer: Choose from Crimson Red, Spotify Green, Neon Purple, Electric Blue, Sunset Orange, Hot Pink, Aqua Teal, Amber Gold, or Material You Dynamic wallpaper theming!
           - Home Screen Floating Dynamic Island (Camera punch hole & expanded playback controls)
           - Permanent Keystore Integration for clean in-app updates
+          - Native Windows PC Desktop Edition (.exe) support!
+
+  build-desktop-release:
+    runs-on: windows-latest
+    needs: build-prod-release
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - name: Install Dependencies
+        run: pnpm --dir web install
+
+      - name: Build Desktop Executables
+        run: pnpm --dir web/desktop dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          VITE_PARTY_SERVER_URL: "https://listen.resso.app"
+
+      - name: Upload Desktop to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            web/desktop/dist-package/Resso Setup *.exe
+            web/desktop/dist-package/Resso *.exe

@@ -1,5 +1,6 @@
 packages:
   - app
+  - desktop
   - extension
   - shared
 minimumReleaseAgeExclude:
@@ -12,3 +13,4 @@ minimumReleaseAgeExclude:
 # unapproved install script, so it is declined here, explicitly.
 allowBuilds:
   protobufjs: false
+  electron: true

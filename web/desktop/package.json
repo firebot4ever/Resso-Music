@@ -1,0 +1,64 @@
+{
+  "name": "@Resso/desktop",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Resso Music Desktop App for Windows/PC",
+  "main": "dist/main.js",
+  "scripts": {
+    "copy:web": "node -e \"const fs=require('fs'); fs.cpSync('../app/dist', './app-dist', {recursive: true});\"",
+    "build:web": "pnpm --dir ../app build",
+    "compile": "tsc",
+    "build": "pnpm build:web && pnpm copy:web && pnpm compile",
+    "start": "tsc && pnpm copy:web && electron .",
+    "dist": "pnpm build && electron-builder --win"
+  },
+  "dependencies": {
+    "@Resso/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.3"
+  },
+  "build": {
+    "appId": "com.music.resso.desktop",
+    "productName": "Resso",
+    "directories": {
+      "output": "dist-package"
+    },
+    "files": [
+      "dist/**/*",
+      "app-dist/**/*",
+      "assets/**/*"
+    ],
+    "extraMetadata": {
+      "main": "dist/main.js"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Resso"
+    }
+  }
+}

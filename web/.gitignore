@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-package/
+app-dist/
 .output/
 .wxt/
 *.tsbuildinfo
