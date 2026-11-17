@@ -1,25 +1,14 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, Tray, protocol, shell } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, Tray, shell } from 'electron';
 import * as path from 'path';
+import * as http from 'http';
 import * as fs from 'fs';
 import { discordRpc } from './discord';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
-
-// Register privileged custom scheme before app is ready
-protocol.registerSchemesAsPrivileged([
-  {
-    scheme: 'app',
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      corsEnabled: true,
-      stream: true,
-    },
-  },
-]);
+let localServer: http.Server | null = null;
+let localPort = 24859;
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -33,12 +22,17 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     if (process.platform === 'win32') {
       app.setAppUserModelId('com.music.resso.desktop');
     }
 
-    setupCustomProtocol();
+    try {
+      await startLocalServer();
+    } catch (err) {
+      console.error('Failed to start server:', err);
+    }
+
     createMainWindow();
     setupTray();
     setupMediaShortcuts();
@@ -53,56 +47,79 @@ if (!gotTheLock) {
 }
 
 function getAppDistPath(): string {
-  // In development and production (app.asar), app-dist is sibling to dist
   return path.join(__dirname, '../app-dist');
 }
 
-function setupCustomProtocol() {
-  const mimeTypes: Record<string, string> = {
-    '.html': 'text/html; charset=utf-8',
-    '.js': 'application/javascript; charset=utf-8',
-    '.mjs': 'application/javascript; charset=utf-8',
-    '.css': 'text/css; charset=utf-8',
-    '.json': 'application/json; charset=utf-8',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.wasm': 'application/wasm',
-  };
+function startLocalServer(): Promise<number> {
+  return new Promise((resolve) => {
+    const appDir = getAppDistPath();
+    const mimeTypes: Record<string, string> = {
+      '.html': 'text/html; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.mjs': 'application/javascript; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+      '.ttf': 'font/ttf',
+      '.wasm': 'application/wasm',
+    };
 
-  protocol.handle('app', (request) => {
-    try {
-      const url = new URL(request.url);
-      let pathname = decodeURIComponent(url.pathname);
-      if (pathname === '/' || !path.extname(pathname)) {
-        pathname = '/index.html';
-      }
+    localServer = http.createServer((req, res) => {
+      try {
+        let reqPath = decodeURIComponent(req.url?.split('?')[0] || '/');
+        if (reqPath === '/' || !path.extname(reqPath)) {
+          reqPath = '/index.html';
+        }
 
-      const safePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '');
-      let filePath = path.join(getAppDistPath(), safePath);
+        const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '').replace(/^\/+/, '');
+        let filePath = path.join(appDir, safePath);
 
-      if (!fs.existsSync(filePath)) {
-        filePath = path.join(getAppDistPath(), 'index.html');
-      }
+        if (!fs.existsSync(filePath)) {
+          filePath = path.join(appDir, 'index.html');
+        }
 
-      const ext = path.extname(filePath).toLowerCase();
-      const data = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const data = fs.readFileSync(filePath);
 
-      return new Response(data, {
-        status: 200,
-        headers: {
+        res.writeHead(200, {
           'Content-Type': mimeTypes[ext] || 'application/octet-stream',
           'Access-Control-Allow-Origin': '*',
-        },
+          'Cache-Control': 'no-cache',
+        });
+        res.end(data);
+      } catch {
+        res.writeHead(500);
+        res.end('Internal Server Error');
+      }
+    });
+
+    const tryPort = (port: number) => {
+      localServer?.listen(port, '127.0.0.1', () => {
+        const addr = localServer?.address();
+        if (addr && typeof addr === 'object') {
+          localPort = addr.port;
+        } else {
+          localPort = port;
+        }
+        resolve(localPort);
       });
-    } catch {
-      return new Response('Not Found', { status: 404 });
-    }
+
+      localServer?.on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE' && port !== 0) {
+          tryPort(0);
+        } else {
+          resolve(24859);
+        }
+      });
+    };
+
+    tryPort(localPort);
   });
 }
 
@@ -131,10 +148,10 @@ function createMainWindow() {
   if (devUrl) {
     mainWindow.loadURL(devUrl);
   } else {
-    mainWindow.loadURL('app://resso/index.html');
+    mainWindow.loadURL(`http://127.0.0.1:${localPort}/`);
   }
 
-  // Allow F12 or Ctrl+Shift+I to open DevTools
+  // Allow F12 or Ctrl+Shift+I to toggle DevTools
   mainWindow.webContents.on('before-input-event', (_event, input) => {
     if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
       mainWindow?.webContents.toggleDevTools();
@@ -368,4 +385,9 @@ function setupIpc() {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (localServer) {
+    try {
+      localServer.close();
+    } catch {}
+  }
 });
